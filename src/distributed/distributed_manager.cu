@@ -51,6 +51,7 @@
 
 #include <algorithm>
 #include <iostream> //debug only:
+#include <set>
 
 struct is_my_part : public amgx::thrust::unary_function<int, bool>
 {
@@ -1077,8 +1078,6 @@ template <AMGX_VecPrecision t_vecPrec, AMGX_MatPrecision t_matPrec, AMGX_IndPrec
 template <typename t_colIndex>
 std::map<t_colIndex, int> DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indPrec> >::loadDistributed_LocalToGlobal(int num_rows, I64Vector_h &off_diag_cols)
 {
-    // sort global column indices
-    amgx::thrust::sort(off_diag_cols.begin(), off_diag_cols.end());
     // find unique columns and set local <-> global mappings
     // 1) Removed unneeded vector 2) Create map on host first, upload later (less thrust calls)
     I64Vector_h local_to_global_h;
@@ -1159,7 +1158,8 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
     int num_ranks,
     int num_rows_global,
     const void *diag,
-    const int *partition)
+    const int *partition,
+    const void *row_map)
 {
     // fetch my rank
     int my_id = this->getComms()->get_global_id();
@@ -1207,9 +1207,14 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
 
     for (int i = 0; i < num_rows_global; i++)
     {
-        int     pvi = partitionVec[i];
+        int pvi = partitionVec[i];
         t_colIndex poi = partition_offsets[pvi];
-        partition_map[poi] = i;
+        t_colIndex globalRow = i;
+        if(row_map) {
+            globalRow = ((t_colIndex*)row_map)[poi];
+        }
+
+        partition_map[poi] = globalRow;
         partition_offsets[pvi]++;
     }
     free(partition_offsets);
@@ -1224,22 +1229,45 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
     free(partition_map);
 
     int h_cidx_allocated = 0;
-    const t_colIndex *h_col_indices_global = (const t_colIndex *)this->getHostPointerForData(col_indices, num_nonzeros * sizeof(t_colIndex), &h_cidx_allocated);
+    const t_colIndex *h_col_indices_global = (const t_colIndex *)this->getHostPointerForData(col_indices, (row_map ? 2 : 1) * num_nonzeros * sizeof(t_colIndex), &h_cidx_allocated);
     // gather all off-diag columns
     I64Vector_h off_diag_cols;
-
-    for (int i = 0; i < num_nonzeros; i++)
-    {
-        if (partitionVec[h_col_indices_global[i]] != my_id)
+    if(row_map) {
+        int num_off_diag_cols = 0;
+        std::set<int> off_diag_set;
+        for(int i = 0; i < num_nonzeros; i++) {
+            if (partitionVec[h_col_indices_global[i]] != my_id)
+            {
+                auto val = h_col_indices_global[i];
+                if(off_diag_set.count(val) == 0) {
+                    off_diag_set.insert(val);
+                    num_off_diag_cols++;
+                }
+            }
+        }
+        off_diag_cols.resize(num_off_diag_cols, -1);
+        for (int i = 0; i < num_nonzeros; i++)
         {
-            off_diag_cols.push_back(ipartition_map[h_col_indices_global[i]]);
+            if (partitionVec[h_col_indices_global[i]] != my_id)
+            {
+                int idx = h_col_indices_global[i + num_nonzeros] - num_rows;
+                off_diag_cols[idx] = ipartition_map[h_col_indices_global[i]];
+            }
         }
     }
-
+    else {
+        for(int i = 0; i < num_nonzeros; i++) {
+            if(partitionVec[h_col_indices_global[i]] != my_id) {
+                off_diag_cols.push_back(ipartition_map[h_col_indices_global[i]]);
+            }
+        }
+        // sort global column indices
+        thrust::sort(off_diag_cols.begin(), off_diag_cols.end());
+    }
     auto global_to_local = loadDistributed_LocalToGlobal<t_colIndex>(num_rows, off_diag_cols);
 
     // set 1, then scan to compute local row indices
-    IVector_h my_indices(num_rows_global);
+    IVector_h my_indices(num_rows_global, 0);
 
     for (int i = 0; i < num_nonzeros; i++)
     {
@@ -1264,6 +1292,12 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
         {
             // diag
             local_col_indices[i] = my_indices[ipartition_map[h_col_indices_global[i]]];
+        }
+        if(row_map) {
+            if(local_col_indices[i] != h_col_indices_global[i + num_nonzeros]) {
+                printf("LOCAL COL INDEX MISMATCH %i %i %i %i\n", local_col_indices[i],
+                       h_col_indices_global[i + num_nonzeros], my_id, partitionVec[h_col_indices_global[i]]);
+            }
         }
     }
     free(ipartition_map);
@@ -1298,6 +1332,9 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
     int my_id = this->getComms()->get_global_id();
     // sanity check, cheap to perform, and helps prevent harder-to-debug errors later on
     if (!std::is_sorted(partition_offsets, partition_offsets + num_ranks + 1)) {
+        printf("partitiion offsets\n");
+        for(int ii=0; ii<=num_ranks; ++ii)
+            printf("offset %i\n", partition_offsets[ii]);
         FatalError("Partition offsets are not sorted.", AMGX_ERR_BAD_PARAMETERS);
     }
     loadDistributed_SetOffsets(num_ranks, num_rows_global, partition_offsets);
@@ -1320,6 +1357,8 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
             off_diag_cols.push_back(h_col_indices_global[i]);
         }
     }
+    // sort global column indices
+    thrust::sort(off_diag_cols.begin(), off_diag_cols.end());
     auto global_to_local = loadDistributed_LocalToGlobal<t_colIndex>(num_rows, off_diag_cols);
     // set 1, then scan to compute local row indices
     // "coordinate-shift" columns so they lie in much smaller range of my diagonal indices
@@ -1376,12 +1415,16 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
     using PI = MatrixDistribution::PartitionInformation;
     switch (dist.getPartitionInformationStyle()) {
         case PI::PartitionVec:
-            loadDistributedMatrixPartitionVec(num_rows, num_nonzeros, block_dimx, block_dimy, 
-                row_offsets, col_indices, values, num_ranks, num_rows_global, diag, (const int*) dist.getPartitionData());
+            loadDistributedMatrixPartitionVec(num_rows, num_nonzeros, block_dimx, block_dimy,
+                row_offsets, col_indices, values, num_ranks, num_rows_global, diag, (const int*) dist.getPartitionData(), nullptr);
             break;
         case PI::PartitionOffsets:
-            loadDistributedMatrixPartitionOffsets(num_rows, num_nonzeros, block_dimx, block_dimy, 
+            loadDistributedMatrixPartitionOffsets(num_rows, num_nonzeros, block_dimx, block_dimy,
                 row_offsets, col_indices, values, num_ranks, num_rows_global, diag, (const t_colIndex*) dist.getPartitionData());
+            break;
+            case PI::PartitionVecMap:
+            loadDistributedMatrixPartitionVec(num_rows, num_nonzeros, block_dimx, block_dimy,
+                row_offsets, col_indices, values, num_ranks, num_rows_global, diag, (const int*) dist.getPartitionData(), dist.getRowMap());
             break;
         default:
             FatalError("Unsupported partitioning data format used with loadDistributedMatrix", AMGX_ERR_NOT_IMPLEMENTED);
@@ -2385,9 +2428,9 @@ void DistributedManagerBase<TConfig>::createComms(Resources *rsrc)
         std::string comm_log("Using Normal MPI (Hostbuffer) communicator...\n");
         amgx_distributed_output(comm_log.c_str(), comm_log.length());
     }
-    else 
-    { 
-        FatalError("Bad communicator value", AMGX_ERR_BAD_PARAMETERS); 
+    else
+    {
+        FatalError("Bad communicator value", AMGX_ERR_BAD_PARAMETERS);
     }
 
 #endif
@@ -5711,7 +5754,7 @@ void DistributedManager<TemplateConfig<AMGX_host, t_vecPrec, t_matPrec, t_indPre
 template <AMGX_VecPrecision t_vecPrec, AMGX_MatPrecision t_matPrec, AMGX_IndPrecision t_indPrec>
 template <typename t_colIndex>
 void DistributedManager<TemplateConfig<AMGX_host, t_vecPrec, t_matPrec, t_indPrec> >::loadDistributedMatrix(
-    int num_rows, int num_nonzeros, const int block_dimx, const int block_dimy, const int *row_offsets, 
+    int num_rows, int num_nonzeros, const int block_dimx, const int block_dimy, const int *row_offsets,
     const t_colIndex *col_indices, const mat_value_type *values, int num_ranks, int num_rows_global, const void *diag, const MatrixDistribution &dist)
 {
     FatalError("loadDistributedMatrix only implemented on devices", AMGX_ERR_NOT_IMPLEMENTED);

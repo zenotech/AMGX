@@ -795,6 +795,60 @@ inline AMGX_ERROR matrix_vector_multiply(AMGX_matrix_handle mtx,
     return AMGX_OK;
 }
 
+template<AMGX_Mode CASE,
+         template<typename> class MatrixType,
+         template<typename> class VectorType,
+         template<typename> class SolverType>
+inline AMGX_ERROR solver_calculate_residual( AMGX_solver_handle slv,
+        AMGX_matrix_handle mtx,
+        AMGX_vector_handle rhs,
+        AMGX_vector_handle x,
+        Resources *resources,
+        AMGX_vector_handle r)
+{
+    typedef MatrixType<typename TemplateMode<CASE>::Type> MatrixLetterT;
+    typedef CWrapHandle<AMGX_matrix_handle, MatrixLetterT> MatrixW;
+    typedef VectorType<typename TemplateMode<CASE>::Type> VectorLetterT;
+    typedef CWrapHandle<AMGX_vector_handle, VectorLetterT> VectorW;
+    typedef SolverType<typename TemplateMode<CASE>::Type> SolverLetterT;
+    typedef CWrapHandle<AMGX_solver_handle, SolverLetterT> SolverW;
+    SolverW wrapSolver(slv);
+    SolverLetterT &solver = *wrapSolver.wrapped();
+    MatrixW wrapA(mtx);
+    MatrixLetterT &A = *wrapA.wrapped();
+    VectorW wrapRhs(rhs);
+    VectorLetterT &v_rhs = *wrapRhs.wrapped();
+    VectorW wrapX(x);
+    VectorLetterT &v_x = *wrapX.wrapped();
+    VectorW wrapR(r);
+    VectorLetterT &v_r = *wrapR.wrapped();
+
+    if (wrapX.mode() != wrapA.mode())
+    {
+        FatalError("Error: mismatch between vector x mode and matrix mode.\n", AMGX_ERR_BAD_PARAMETERS);
+    }
+
+    if (wrapX.mode() != wrapRhs.mode())
+    {
+        FatalError("Error: mismatch between vector y mode and vector x mode.\n", AMGX_ERR_BAD_PARAMETERS);
+    }
+
+    if (wrapX.mode() != wrapR.mode())
+    {
+        FatalError("Error: mismatch between vector r mode and vector x mode.\n", AMGX_ERR_BAD_PARAMETERS);
+    }
+
+    if ((A.getResources() != v_rhs.getResources())
+            || (A.getResources() != v_x.getResources())
+            || (A.getResources() != v_r.getResources()))
+    {
+        FatalError("Error: Inconsistency between matrix and vectors resources object, exiting", AMGX_ERR_BAD_PARAMETERS);
+    }
+
+    cudaSetDevice(resources->getDevice(0));
+    solver.getSolverObject()->compute_residual(v_rhs, v_x, v_r);
+    return AMGX_OK;
+}
 
 template<AMGX_Mode CASE,
          template<typename> class MatrixType,
@@ -1747,10 +1801,10 @@ inline AMGX_RC matrix_upload_distributed(AMGX_matrix_handle mtx,
 
     A_part.manager = new DistributedManager<TConfig>(A_part);
     A_part.setManagerExternal();
-    /* Load distributed matrix 
+    /* Load distributed matrix
         Choose correct overload based on column index type
      */
-    if (mdist.get32BitColIndices()) 
+    if (mdist.get32BitColIndices())
     {
         A_part.manager->loadDistributedMatrix(n, nnz, block_dimx, block_dimy, row_ptrs, (int *)col_indices_global,
             (ValueType *)data, num_ranks, n_global, diag_data, mdist);
@@ -1805,7 +1859,7 @@ inline AMGX_RC matrix_upload_all_global(AMGX_matrix_handle mtx,
 }
 
 template<AMGX_Mode CASE>
-inline AMGX_RC matrix_upload_all_global_32(AMGX_matrix_handle mtx, 
+inline AMGX_RC matrix_upload_all_global_32(AMGX_matrix_handle mtx,
                                            int n_global,
                                            int n,
                                            int nnz,
@@ -1829,7 +1883,7 @@ inline AMGX_RC matrix_upload_all_global_32(AMGX_matrix_handle mtx,
     auto rc = matrix_upload_distributed<CASE>(mtx, n_global, n, nnz, block_dimx, block_dimy, row_ptrs, col_indices_global,
         data, diag_data, dist);
     AMGX_distribution_destroy(dist);
-    return rc;    
+    return rc;
 }
 #endif
 
@@ -2670,6 +2724,37 @@ extern "C" {
         return getCAPIerror_x(rc);
     }
 
+    AMGX_RC AMGX_API AMGX_solver_calculate_residual(AMGX_solver_handle solver, AMGX_matrix_handle mtx, AMGX_vector_handle rhs, AMGX_vector_handle x, AMGX_vector_handle r)
+    {
+        nvtxRange nvrf(__func__);
+
+        AMGX_CPU_PROFILER( "AMGX_solver_solve " );
+        Resources *resources;
+        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL);
+        AMGX_ERROR rc = AMGX_OK;
+
+        try
+        {
+            AMGX_Mode mode = get_mode_from<AMGX_matrix_handle>(mtx);
+
+            switch (mode)
+            {
+#define AMGX_CASE_LINE(CASE) case CASE: { \
+      AMGX_ERROR rcs = solver_calculate_residual<CASE, Matrix, Vector, AMG_Solver>(solver, mtx, rhs, x, resources, r); \
+      AMGX_CHECK_API_ERROR(rcs, resources); break;\
+          }
+                    AMGX_FORALL_BUILDS(AMGX_CASE_LINE)
+                    AMGX_FORCOMPLEX_BUILDS(AMGX_CASE_LINE)
+#undef AMGX_CASE_LINE
+
+                default:
+                    AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_MODE, resources)
+            }
+        }
+
+        AMGX_CATCHES(rc)
+        return getCAPIerror_x(rc);
+    }
 
     AMGX_RC AMGX_API AMGX_solver_destroy(AMGX_solver_handle slv)
     {
@@ -4641,8 +4726,8 @@ extern "C" {
 
         AMGX_CATCHES(rc)
         return AMGX_OK != rc ? getCAPIerror_x(rc) : rc0;
-    }   
-    
+    }
+
     AMGX_RC AMGX_API AMGX_matrix_upload_distributed(AMGX_matrix_handle mtx,
             int n_global,
             int n,
@@ -4855,7 +4940,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         AMGX_ERROR rc = AMGX_OK;
-        try 
+        try
         {
             auto *mdist = create_managed_object<MatrixDistribution, AMGX_distribution_handle>(dist);
             if (cfg != NULL)
@@ -4881,7 +4966,7 @@ extern "C" {
         AMGX_ERROR rc = AMGX_OK;
         try
         {
-            if (!remove_managed_object<AMGX_distribution_handle, MatrixDistribution>(dist)) 
+            if (!remove_managed_object<AMGX_distribution_handle, MatrixDistribution>(dist))
             {
                 rc = AMGX_ERR_BAD_PARAMETERS;
             }
@@ -4894,11 +4979,11 @@ extern "C" {
         return AMGX_RC_OK;
     }
 
-    AMGX_RC AMGX_API AMGX_distribution_set_partition_data(AMGX_distribution_handle dist, AMGX_DIST_PARTITION_INFO info, const void *partition_data)
+    AMGX_RC AMGX_API AMGX_distribution_set_partition_data(AMGX_distribution_handle dist, AMGX_DIST_PARTITION_INFO info, const void *partition_data, const void* row_map)
     {
         nvtxRange nvrf(__func__);
 
-        if (dist == NULL) 
+        if (dist == NULL || partition_data == NULL)
         {
             AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
         }
@@ -4912,6 +4997,9 @@ extern "C" {
                 break;
             case AMGX_DIST_PARTITION_OFFSETS:
                 mdist.setPartitionOffsets(partition_data);
+                break;
+            case AMGX_DIST_PARTITION_VECTOR_MAP:
+                mdist.setPartitionVecMap((const int*)partition_data, row_map);
                 break;
             default:
                 AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
