@@ -1299,6 +1299,12 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
                        h_col_indices_global[i + num_nonzeros], my_id, partitionVec[h_col_indices_global[i]]);
             }
         }
+        if(row_map) {
+            if(local_col_indices[i] != h_col_indices_global[i + num_nonzeros]) {
+                printf("LOCAL COL INDEX MISMATCH %i %i %i %i\n", local_col_indices[i],
+                       h_col_indices_global[i + num_nonzeros], my_id, partitionVec[h_col_indices_global[i]]);
+            }
+        }
     }
     free(ipartition_map);
 
