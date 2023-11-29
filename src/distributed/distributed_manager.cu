@@ -24,7 +24,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#undef NDEBUG
 #include <distributed/distributed_manager.h>
 #include <distributed/comms_mpi_gpudirect.h>
 #include <distributed/comms_mpi_hostbuffer_stream.h>
