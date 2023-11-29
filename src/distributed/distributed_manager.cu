@@ -1314,11 +1314,14 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
                         h_col_indices_global[i + num_nonzeros], my_id, partitionVec[h_col_indices_global[i]]);
                 }
             } else {
-                idx = std::find(row_map_off_proc.begin(), row_map_off_proc.end(), idx) - row_map_off_proc.begin();
-                if (partitionVec[h_col_indices_global[i]] != my_id) {
-                    if(idx >= 0 && local_col_indices[i] != idx + num_rows) {
-                        printf("LOCAL COL INDEX MISMATCH HALO %i %i %i %i\n", local_col_indices[i],
-                            h_col_indices_global[i + num_nonzeros], my_id, partitionVec[h_col_indices_global[i]]);
+                auto loc = std::find(row_map_off_proc.begin(), row_map_off_proc.end(), idx);
+                if(loc != row_map_off_proc.end()) {
+                    idx = loc - row_map_off_proc.begin();
+                    if (partitionVec[h_col_indices_global[i]] != my_id) {
+                        if(idx >= 0 && local_col_indices[i] != idx + num_rows) {
+                            printf("LOCAL COL INDEX MISMATCH HALO %i %i %i %i %i\n", local_col_indices[i], idx + num_rows,
+                                h_col_indices_global[i + num_nonzeros], my_id, partitionVec[h_col_indices_global[i]]);
+                        }
                     }
                 }
             }
