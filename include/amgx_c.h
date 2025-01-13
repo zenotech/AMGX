@@ -319,6 +319,13 @@ AMGX_RC AMGX_API AMGX_matrix_get_nnz
 (const AMGX_matrix_handle mtx,
  int *nnz);
 
+AMGX_RC AMGX_API AMGX_matrix_get_all
+(const AMGX_matrix_handle mtx,
+ int **row_ptrs,
+ void **col_indices,
+ void **data,
+ void **diag_data);
+
 AMGX_RC AMGX_API AMGX_matrix_download_all
 (const AMGX_matrix_handle mtx,
  int *row_ptrs,
@@ -379,6 +386,10 @@ AMGX_RC AMGX_API AMGX_vector_set_zero
 AMGX_RC AMGX_API AMGX_vector_set_random
 (AMGX_vector_handle vec,
  int n);
+
+AMGX_RC AMGX_API AMGX_vector_get
+(const AMGX_vector_handle vec,
+ void **data);
 
 AMGX_RC AMGX_API AMGX_vector_download
 (const AMGX_vector_handle vec,
