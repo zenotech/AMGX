@@ -1131,7 +1131,8 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
     amgx::thrust::copy(row_offsets, row_offsets + num_rows + 1, this->A->row_offsets.begin());
     this->A->col_indices = local_col_indices;
 
-    amgx::thrust::copy(values, values + num_nonzeros * block_dimx * block_dimy, this->A->values.begin());
+    if (values) 
+       amgx::thrust::copy(values, values + num_nonzeros * block_dimx * block_dimy, this->A->values.begin());
     cudaCheckError();
 
     // setup diagonal

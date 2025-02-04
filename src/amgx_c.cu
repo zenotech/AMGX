@@ -1230,6 +1230,45 @@ inline AMGX_RC vector_set_random(AMGX_vector_handle vec, int n, Resources *resou
 }
 
 template<AMGX_Mode CASE>
+inline AMGX_RC vector_get_impl(const AMGX_vector_handle vec,
+                                    void **data)
+{
+    typedef Vector<typename TemplateMode<CASE>::Type> VectorLetterT;
+    typedef CWrapHandle<AMGX_vector_handle, VectorLetterT> VectorW;
+    typedef typename VecPrecisionMap<AMGX_GET_MODE_VAL(AMGX_VecPrecision, CASE)>::Type ValueTypeB;
+    VectorW wrapV(vec);
+    VectorLetterT &v = *wrapV.wrapped();
+    /*if (!wrapV.is_valid()
+        || n < 0
+        || block_dim < 1)
+        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, resources)*/
+    cudaSetDevice(v.getResources()->getDevice(0));
+
+    if (v.getManager() != NULL)
+    {
+        int n, nnz;
+        int block_dimy = v.get_block_dimy();
+        v.getManager()->getView(OWNED, n, nnz);
+
+        if (v.is_transformed() || v.getManager()->isFineLevelGlued())
+        {
+	   FatalError("Cannot get transformed vector", AMGX_ERR_NOT_IMPLEMENTED); 
+            // v.getManager()->revertAndDownloadVector(v, data, n, block_dimy);
+        }
+        else
+        {
+	    *data = v.raw();
+        }
+    }
+    else
+    {
+	*data = v.raw();
+    }
+
+    return AMGX_RC_OK;
+}
+
+template<AMGX_Mode CASE>
 inline AMGX_RC vector_download_impl(const AMGX_vector_handle vec,
                                     void *data)
 {
@@ -1840,6 +1879,17 @@ inline AMGX_RC matrix_upload_distributed(AMGX_matrix_handle mtx,
     /* Create B2L_maps for comm */
     A_part.manager->renumberMatrixOneRing();
 
+
+    if(A_part.manager->renumbering.size() && num_ranks > 1){
+	    for(int i=0;i<n;++i){
+		    if(A_part.manager->renumbering[i] != i){
+	    std::string val = std::to_string(i) + " " + std::to_string(A_part.manager->renumbering[i]);
+	    amgx_distributed_output(val.c_str(), val.length());
+	    FatalError("External renumbering failed", AMGX_ERR_CORE);
+		    }
+	    }
+    }
+
     /* Exchange 1 ring halo rows (for d2 interp) */
     if (mdist.getNumImportRings() == 2)
     {
@@ -2060,6 +2110,24 @@ inline void solver_get_status(AMGX_solver_handle slv, AMGX_SOLVE_STATUS *st)
         default:
             *st = AMGX_SOLVE_FAILED;
     }
+}
+
+template<AMGX_Mode CASE>
+inline void matrix_get_all(const AMGX_matrix_handle mtx,
+                                int **row_ptrs,
+                                void **col_indices,
+                                void **data,
+                                void **diag_data)
+{
+    typedef Matrix<typename TemplateMode<CASE>::Type> MatrixLetterT;
+    typedef CWrapHandle<AMGX_matrix_handle, MatrixLetterT> MatrixW;
+    MatrixW wrapA(mtx);
+    MatrixLetterT &A = *wrapA.wrapped();
+    typedef typename MatPrecisionMap<AMGX_GET_MODE_VAL(AMGX_MatPrecision, CASE)>::Type ValueType;
+
+    *row_ptrs = A.row_offsets.raw();
+    *col_indices = A.col_indices.raw();
+    *data = A.values.raw();
 }
 
 template<AMGX_Mode CASE>
@@ -3530,6 +3598,50 @@ extern "C" {
         return rc0;
     }
 
+    AMGX_RC AMGX_vector_get_impl(const AMGX_vector_handle vec, void **data)
+    {
+        nvtxRange nvrf(__func__);
+
+        AMGX_CPU_PROFILER( "AMGX_vector_get " );
+        Resources *resources;
+        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)), NULL)
+        //if (!c_vec || !c_vec->is_valid()) return AMGX_RC_BAD_PARAMETERS;
+        AMGX_ERROR rc = AMGX_OK;
+        AMGX_RC rc0 = AMGX_RC_OK;
+
+        AMGX_TRIES()
+        {
+            AMGX_Mode mode = get_mode_from<AMGX_vector_handle>(vec);
+
+            switch (mode)
+            {
+#define AMGX_CASE_LINE(CASE) case CASE: {\
+        rc0 = vector_get_impl<CASE>(vec, data);\
+        } \
+        break;
+                    AMGX_FORALL_BUILDS(AMGX_CASE_LINE)
+                    AMGX_FORCOMPLEX_BUILDS(AMGX_CASE_LINE)
+#undef AMGX_CASE_LINE
+
+                default:
+                    AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_MODE, resources)
+                    //return AMGX_RC_BAD_MODE;
+            }
+        }
+
+        AMGX_CATCHES(rc)
+        AMGX_CHECK_API_ERROR(rc, resources)
+        return rc0;
+        //return getCAPIerror(rc);
+    }
+
+    AMGX_RC AMGX_API AMGX_vector_get(const AMGX_vector_handle vec, void **data)
+    {
+        nvtxRange nvrf(__func__);
+
+        return AMGX_vector_get_impl(vec, data);
+    }
+
     AMGX_RC AMGX_vector_download_impl(const AMGX_vector_handle vec, void *data)
     {
         nvtxRange nvrf(__func__);
@@ -3955,6 +4067,47 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         return AMGX_matrix_get_nnz_impl(mtx, nnz);
+    }
+
+    AMGX_RC AMGX_matrix_get_all_impl(const AMGX_matrix_handle mtx, int **row_ptrs, void **col_indices, void **data, void **diag_data)
+    {
+        nvtxRange nvrf(__func__);
+
+        Resources *resources = NULL;
+        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        //if (!c_mtx || !c_mtx->is_valid()) return AMGX_RC_BAD_PARAMETERS;
+        AMGX_ERROR rc = AMGX_OK;
+
+        AMGX_TRIES()
+        {
+            AMGX_Mode mode = get_mode_from(mtx);
+
+            switch (mode)
+            {
+#define AMGX_CASE_LINE(CASE) case CASE: { \
+        matrix_get_all<CASE>(mtx, row_ptrs, col_indices, data, diag_data); \
+    } \
+    break;
+                    AMGX_FORALL_BUILDS(AMGX_CASE_LINE)
+                    AMGX_FORCOMPLEX_BUILDS(AMGX_CASE_LINE)
+#undef AMGX_CASE_LINE
+
+                default:
+                    AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_MODE, resources)
+            }
+        }
+
+        AMGX_CATCHES(rc)
+        AMGX_CHECK_API_ERROR(rc, resources)
+        return AMGX_RC_OK;
+        //return getCAPIerror(rc);
+    }
+
+    AMGX_RC AMGX_API AMGX_matrix_get_all(const AMGX_matrix_handle mtx, int **row_ptrs, void **col_indices, void **data, void **diag_data)
+    {
+        nvtxRange nvrf(__func__);
+
+        return AMGX_matrix_get_all_impl(mtx, row_ptrs, col_indices, data, diag_data);
     }
 
     AMGX_RC AMGX_matrix_download_all_impl(const AMGX_matrix_handle mtx, int *row_ptrs, int *col_indices, void *data, void **diag_data)
