@@ -3602,7 +3602,7 @@ extern "C" {
     {
         nvtxRange nvrf(__func__);
 
-        AMGX_CPU_PROFILER( "AMGX_vector_download " );
+        AMGX_CPU_PROFILER( "AMGX_vector_get " );
         Resources *resources;
         AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)), NULL)
         //if (!c_vec || !c_vec->is_valid()) return AMGX_RC_BAD_PARAMETERS;
