@@ -1134,7 +1134,7 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
     if (values) {
        amgx::thrust::copy(values, values + num_nonzeros * block_dimx * block_dimy, this->A->values.begin());
     } else {
-        cudaMemset(this->A->values.begin(), 0, num_nonzeros * block_dimx * block_dimy);
+        cudaMemset(this->A->values.begin(), 0, num_nonzeros * block_dimx * block_dimy * sizeof(mat_value_type));
     }
     cudaCheckError();
 
