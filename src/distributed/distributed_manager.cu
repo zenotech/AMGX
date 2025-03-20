@@ -4878,6 +4878,30 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
         return;
     }
 
+    if(data_pinned == nullptr){
+	    bool fail = false;
+	    printf("%d %d\n", this->renumbering.size(), num_rows);
+        for(int i = 0; i < num_rows; ++i)
+        {
+            if(this->renumbering[i] != i)
+            {
+		    fail = true;
+		printf("%d %lld\n",i,this->renumbering[i]);
+	    }
+	    if(fail){
+                FatalError("DistributedManager::replaceMatrixCoefficientsNoCons: renumbering is not identity, but data_pinned is nullptr", AMGX_ERR_BAD_PARAMETERS);
+            }
+        }
+        for(int i = 0; i < this->old_row_offsets.size(); ++i)
+        {
+            if(this->old_row_offsets[i] != this->A->row_offsets[i])
+            {
+                FatalError("DistributedManager::replaceMatrixCoefficientsNoCons: old_row_offsets is not identity, but data_pinned is nullptr", AMGX_ERR_BAD_PARAMETERS);
+            }
+        }
+        return;
+    }
+
     cudaCheckError();
     /* allocate if data and diag if they are not pinned */
     data_hd = (mat_value_type *) this->getDevicePointerForData((void *)data_pinned, nnz * block_size * sizeof(mat_value_type), &data_alloc);
