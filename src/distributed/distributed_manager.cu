@@ -1131,8 +1131,11 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
     amgx::thrust::copy(row_offsets, row_offsets + num_rows + 1, this->A->row_offsets.begin());
     this->A->col_indices = local_col_indices;
 
-    if (values) 
+    if (values) {
        amgx::thrust::copy(values, values + num_nonzeros * block_dimx * block_dimy, this->A->values.begin());
+    } else {
+        cudaMemset(this->A->values.raw(), 0, num_nonzeros * block_dimx * block_dimy * sizeof(mat_value_type));
+    }
     cudaCheckError();
 
     // setup diagonal
@@ -4872,6 +4875,30 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
     /* check early exit */
     if ((this->neighbors.size() == 0 || this->renumbering.size() == 0) && !this->m_is_fine_level_glued)
     {
+        return;
+    }
+
+    if(data_pinned == nullptr){
+	    bool fail = false;
+	    printf("%d %d\n", this->renumbering.size(), num_rows);
+        for(int i = 0; i < num_rows; ++i)
+        {
+            if(this->renumbering[i] != i)
+            {
+		    fail = true;
+		printf("%d %lld\n",i,this->renumbering[i]);
+	    }
+	    if(fail){
+                FatalError("DistributedManager::replaceMatrixCoefficientsNoCons: renumbering is not identity, but data_pinned is nullptr", AMGX_ERR_BAD_PARAMETERS);
+            }
+        }
+        for(int i = 0; i < this->old_row_offsets.size(); ++i)
+        {
+            if(this->old_row_offsets[i] != this->A->row_offsets[i])
+            {
+                FatalError("DistributedManager::replaceMatrixCoefficientsNoCons: old_row_offsets is not identity, but data_pinned is nullptr", AMGX_ERR_BAD_PARAMETERS);
+            }
+        }
         return;
     }
 
