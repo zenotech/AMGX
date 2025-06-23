@@ -1,29 +1,6 @@
-/* Copyright (c) 2011-2017, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// SPDX-FileCopyrightText: 2011 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
 #pragma once
 
@@ -57,7 +34,9 @@ class CR_SelectorBase : public Selector<T_Config>
                                   IVector &scratch,
                                   int cf_map_init = 0);
 
-        CR_SelectorBase() {};
+        CR_SelectorBase(AMG_Config &cfg, const std::string &cfg_scope) : 
+          Selector<T_Config>(cfg, cfg_scope) {}
+
         virtual ~CR_SelectorBase() {};
 
     protected:
@@ -80,6 +59,9 @@ class CR_Selector< TemplateConfig<AMGX_host, t_vecPrec, t_matPrec, t_indPrec> > 
         typedef Matrix<TConfig_h> Matrix_h;
         typedef typename Matrix_h::IVector IVector;
 
+    public:
+        CR_Selector(AMG_Config &cfg, const std::string &cfg_scope) : 
+          CR_SelectorBase<TConfig_h>(cfg, cfg_scope) {}
     private:
         void markCoarseFinePoints_1x1(Matrix_h &A,
                                       IVector &cf_map)
@@ -105,7 +87,7 @@ class CR_Selector< TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indPrec> 
 
 
     public:
-        CR_Selector();
+        CR_Selector(AMG_Config &cfg, const std::string &cfg_scope);
         virtual ~CR_Selector();
 
     private:
@@ -127,7 +109,10 @@ template<class T_Config>
 class CR_SelectorFactory : public SelectorFactory<T_Config>
 {
     public:
-        Selector<T_Config> *create() { return new CR_Selector<T_Config>; }
+        Selector<T_Config> *create(AMG_Config &cfg, const std::string &cfg_scope) 
+        { 
+          return new CR_Selector<T_Config>(cfg, cfg_scope); 
+        }
 
 };
 

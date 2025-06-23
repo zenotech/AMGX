@@ -1,29 +1,6 @@
-/* Copyright (c) 2011-2017, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// SPDX-FileCopyrightText: 2011 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
 #include <fstream>
 #include <cutil.h>
@@ -58,6 +35,7 @@ Strength_BaseBase<T_Config>::Strength_BaseBase(AMG_Config &cfg,
         const std::string &cfg_scope)
 {
     alpha = cfg.AMG_Config::template getParameter<double>("strength_threshold", cfg_scope);
+    m_use_opt_kernels = cfg.AMG_Config::template getParameter<int>("use_opt_kernels", "default");
 }
 
 /*************************************************************************
@@ -357,6 +335,115 @@ void computeStrongConnectionsAndWeightsKernel( const IndexType *A_rows,
     }
 }
 
+/*************************************************************************
+* Computes the strength matrix and the connection weights (device)
+************************************************************************/
+template< typename IndexType, typename ValueType, int kCtaSize, bool singleGPU >
+__global__
+void computeStrongConnectionsAndWeightsKernel_opt( const IndexType *A_rows,
+        const IndexType *A_cols,
+        const ValueType *A_vals,
+        int A_num_rows,
+        bool *s_con,
+        float *weights,
+        ValueType alpha,
+        ValueType *row_sum,
+        const double max_row_sum,
+        int64_t base_index)
+{
+    // One warp works on each row and hence one iteration handles
+    // num_warps*numBlock rows. This means atomicAdd() is inevitable.
+    int aRowId = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (aRowId < A_num_rows)
+    {
+        ValueType minVal(0), maxVal(0);
+
+        ValueType diag = ValueType(0);
+
+        utils::syncwarp();
+
+        // Row sum
+        ValueType rowSum = -1.0;
+
+        if (max_row_sum < 1.0) { rowSum = row_sum[aRowId]; }
+
+        // get diagonal, min/max off-diagonals
+        const int aRowBegin = A_rows[aRowId  ];
+        const int aRowEnd   = A_rows[aRowId + 1];
+
+        for ( IndexType aRowIt = aRowBegin; aRowIt < aRowEnd ; ++aRowIt)
+        {
+            IndexType aColId = A_cols[aRowIt];
+            ValueType aValue = A_vals[aRowIt];
+
+            if ( aColId == aRowId ) // only one thread evaluates to true.
+            {
+                diag = aValue;
+            }
+
+            if ( aColId != aRowId )
+            {
+                minVal = min( minVal, aValue );
+                maxVal = max( maxVal, aValue );
+            }
+        }
+
+        if ( singleGPU )
+        {
+            atomicAdd(&weights[aRowId], ourHash(aRowId));
+        }
+        else
+        {
+            atomicAdd(&weights[aRowId], ourHash( (int) base_index + aRowId));
+        }
+
+        utils::syncwarp();
+
+        // Big assumption: diag and off-diag always have the opposite sign.
+        // If diag entry is negative, then all off-diag entries must be positive.
+        // This means max off-diag is to be used to compute the threshold.
+        // If diag entry is positve, the min off-diag is used instead.
+        ValueType threshold;
+        if ( diag < ValueType(0) )
+        {
+            threshold = maxVal*alpha;
+        }
+        else
+        {
+            threshold = minVal*alpha;
+        }
+
+        utils::syncwarp();
+
+        // sum of the column of S
+        for ( IndexType aRowIt = aRowBegin;  aRowIt < aRowEnd ; ++aRowIt)
+        {
+            IndexType aColId = A_cols[aRowIt];
+            ValueType aValue = A_vals[aRowIt];
+            bool is_strongly_connected = false;
+
+            if (max_row_sum < 1.0 && rowSum > max_row_sum)
+            {
+                is_strongly_connected = false;
+            }
+            else
+            {
+                bool is_off_diagonal = aColId != aRowId;
+                is_strongly_connected = is_off_diagonal &&
+                                        stronglyConnectedAHat( aValue, threshold, diag );
+            }
+
+            if ( is_strongly_connected && aColId < A_num_rows)
+            {
+                atomicAdd( &weights[aColId], 1.0f );
+            }
+
+            s_con[aRowIt] = is_strongly_connected;
+        }
+    }
+}
+
 
 template< typename IndexType, typename ValueType, int kCtaSize, bool singleGPU >
 __global__
@@ -444,32 +531,76 @@ computeStrongConnectionsAndWeights_1x1(Matrix_d &A,
 
     if (A.get_num_rows() > 0)
     {
-        if (A.is_matrix_singleGPU())
-            computeStrongConnectionsAndWeightsKernel<IndexType, ValueType, blockSize, true>
-            <<< numBlocks, blockSize>>>(
-                A.row_offsets.raw(),
-                A.col_indices.raw(),
-                A.values.raw(),
-                A.get_num_rows(),
-                s_con.raw(),
-                weights.raw(),
-                this->alpha,
-                compute_row_sum ? sums_ptr.raw() : NULL,
-                max_row_sum,
-                0);
+        if(this->m_use_opt_kernels)
+        {
+            // One row per thread
+            const int blockSize = 128;
+            const int numBlocks = A.get_num_rows() / blockSize + 1;
+
+            if (A.is_matrix_singleGPU()) {
+                computeStrongConnectionsAndWeightsKernel_opt<IndexType, ValueType, blockSize, true>
+                    <<< numBlocks, blockSize>>>(
+                            A.row_offsets.raw(),
+                            A.col_indices.raw(),
+                            A.values.raw(),
+                            A.get_num_rows(),
+                            s_con.raw(),
+                            weights.raw(),
+                            this->alpha,
+                            compute_row_sum ? sums_ptr.raw() : NULL,
+                            max_row_sum,
+                            0);
+            }
+            else {
+                computeStrongConnectionsAndWeightsKernel_opt<IndexType, ValueType, blockSize, false>
+                    <<< numBlocks, blockSize>>>(
+                            A.row_offsets.raw(),
+                            A.col_indices.raw(),
+                            A.values.raw(),
+                            A.get_num_rows(),
+                            s_con.raw(),
+                            weights.raw(),
+                            this->alpha,
+                            compute_row_sum ? sums_ptr.raw() : NULL,
+                            max_row_sum,
+                            A.manager->base_index());
+            }
+        }
         else
-            computeStrongConnectionsAndWeightsKernel<IndexType, ValueType, blockSize, false>
-            <<< numBlocks, blockSize>>>(
-                A.row_offsets.raw(),
-                A.col_indices.raw(),
-                A.values.raw(),
-                A.get_num_rows(),
-                s_con.raw(),
-                weights.raw(),
-                this->alpha,
-                compute_row_sum ? sums_ptr.raw() : NULL,
-                max_row_sum,
-                A.manager->base_index());
+        {
+            const int blockSize = 256;
+            const int numWarps  = blockSize / 32;
+            const int numBlocks = min( 4096, (int) (A.get_num_rows() + numWarps - 1) / numWarps );
+
+            if (A.is_matrix_singleGPU()) {
+                computeStrongConnectionsAndWeightsKernel<IndexType, ValueType, blockSize, true>
+                    <<< numBlocks, blockSize>>>(
+                            A.row_offsets.raw(),
+                            A.col_indices.raw(),
+                            A.values.raw(),
+                            A.get_num_rows(),
+                            s_con.raw(),
+                            weights.raw(),
+                            this->alpha,
+                            compute_row_sum ? sums_ptr.raw() : NULL,
+                            max_row_sum,
+                            0);
+            }
+            else {
+                computeStrongConnectionsAndWeightsKernel<IndexType, ValueType, blockSize, false>
+                    <<< numBlocks, blockSize>>>(
+                            A.row_offsets.raw(),
+                            A.col_indices.raw(),
+                            A.values.raw(),
+                            A.get_num_rows(),
+                            s_con.raw(),
+                            weights.raw(),
+                            this->alpha,
+                            compute_row_sum ? sums_ptr.raw() : NULL,
+                            max_row_sum,
+                            A.manager->base_index());
+            }
+        }
     }
 
     if (!A.is_matrix_singleGPU() && A.currentView() == OWNED)

@@ -18,7 +18,7 @@
             "monitor_residual": 0, 
             "store_res_history": 0, 
             "scope": "amg", 
-            "max_levels": 100, 
+            "max_levels": 50, 
             "cycle": "W", 
             "postsweeps": 1
         }, 
@@ -27,9 +27,9 @@
         "obtain_timings": 1, 
         "max_iters": 100, 
         "monitor_residual": 1, 
-        "convergence": "ABSOLUTE", 
+        "convergence": "RELATIVE_INI", 
         "scope": "main", 
-        "tolerance": 1e-06, 
+        "tolerance" : 1e-06, 
         "norm": "L2"
     }
 }

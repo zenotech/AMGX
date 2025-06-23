@@ -1,29 +1,6 @@
-/* Copyright (c) 2011-2017, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// SPDX-FileCopyrightText: 2011 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -226,7 +203,7 @@ int main(int argc, char **argv)
     }
 
     //int sizeof_m_val = ((AMGX_GET_MODE_VAL(AMGX_MatPrecision, mode) == AMGX_matDouble))? sizeof(double): sizeof(float);
-    int sizeof_v_val = ((AMGX_GET_MODE_VAL(AMGX_VecPrecision, mode) == AMGX_vecDouble)) ? sizeof(double) : sizeof(float);
+    size_t sizeof_v_val = ((AMGX_GET_MODE_VAL(AMGX_VecPrecision, mode) == AMGX_vecDouble)) ? sizeof(double) : sizeof(float);
     /* create config */
     pidx = findParamIndex(argv, argc, "-amg");
     pidy = findParamIndex(argv, argc, "-c");
@@ -295,20 +272,23 @@ int main(int argc, char **argv)
        to be handled on a separate ranks/processor. Finally, the rhs and solution will
        be set to a vector of ones and zeros, respectively. */
     AMGX_generate_distributed_poisson_7pt(A, b, x, nrings, nrings, nx, ny, nz, px, py, pz);
+
     /* generate the rhs and solution */
-    void *h_x = malloc(n * sizeof_v_val);
-    void *h_b = malloc(n * sizeof_v_val);
-    memset(h_x, 0, n * sizeof_v_val);
+    int block_dimx = 1;
+    int block_dimy = 1;
+    void *x_h = malloc(n * block_dimx * sizeof_v_val);
+    void *b_h = malloc(n * block_dimy * sizeof_v_val);
+    memset(x_h, 0, n * block_dimx * sizeof_v_val);
 
     for (int i = 0; i < n; i++)
     {
         if ((AMGX_GET_MODE_VAL(AMGX_VecPrecision, mode) == AMGX_vecFloat))
         {
-            ((float *)h_b)[i] = 1.0f;
+            ((float *)b_h)[i] = 1.0f;
         }
         else
         {
-            ((double *)h_b)[i] = 1.0;
+            ((double *)b_h)[i] = 1.0;
         }
     }
 
@@ -317,22 +297,22 @@ int main(int argc, char **argv)
     if(tidx != -1)
     {
       nrepeats = atoi(argv[tidx+1]);
-      print_callback("Running for %d repeats\n", nrepeats);
+      if (rank == 0) { printf("Running for %d repeats\n", nrepeats); }
     }
-
-
 
     /* set the connectivity information (for the vector) */
     AMGX_vector_bind(x, A);
     AMGX_vector_bind(b, A);
     /* upload the vector (and the connectivity information) */
-    AMGX_vector_upload(x, n, 1, h_x);
-    AMGX_vector_upload(b, n, 1, h_b);
+    AMGX_vector_upload(x, n, 1, x_h);
+    AMGX_vector_upload(b, n, 1, b_h);
     for(int r = 0; r < nrepeats; ++r)
     {
-      /* upload the vector (and the connectivity information) */
-      AMGX_vector_upload(x, n, 1, h_x);
-      AMGX_vector_upload(b, n, 1, h_b);
+      if(r > 0) {
+        // Reset the solution for each repeat
+        AMGX_vector_upload(x, n, block_dimx, x_h);
+      }
+
       /* solver setup */
       //MPI barrier for stability (should be removed in practice to maximize performance)
       MPI_Barrier(amgx_mpi_comm);
@@ -358,6 +338,9 @@ int main(int argc, char **argv)
       }
       else if(status == AMGX_SOLVE_FAILED) {
           print_callback("***Solver Failed\n", 0);
+      }
+      else if(status == AMGX_SOLVE_SUCCESS) {
+          print_callback("***Solver Converged\n", 0);
       }
     }
 

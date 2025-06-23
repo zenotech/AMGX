@@ -1,29 +1,6 @@
-/* Copyright (c) 2011-2017, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// SPDX-FileCopyrightText: 2011 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -327,6 +304,15 @@ int main(int argc, char **argv)
         errAndExit("ERROR: no linear system was specified");
     }
 
+    pidx = findParamIndex(argv, argc, "-cd");
+    if(pidx != -1) 
+    {
+        int diag_dominant = 0;
+
+        printf("Checking matrix is diag dominant\n");
+        AMGX_matrix_check_diag_dominant(A, &diag_dominant);
+    }
+
     pidx = findParamIndex(argv, argc, "-cs");
     if(pidx != -1) 
     {
@@ -346,25 +332,81 @@ int main(int argc, char **argv)
         }
     }
 
+    pidx = findParamIndex(argv, argc, "-om");
+    if(pidx != -1)
+    {
+        AMGX_write_system
+        (A, b, x,
+         argv[pidx + 1]);
+        return 0;
+    }
+
+    // Print out details of matrix as initialised by file and seen by the C API
+    int n;
+    int block_dimx;
+    int block_dimy;
+    AMGX_matrix_get_size(A, &n, &block_dimx, &block_dimy);
+
+    if(block_dimx > 1 || block_dimy > 1) {
+        if(rank == 0) { printf("Matrix A has %d rows with %d x %d blocks\n", n, block_dimx, block_dimy); };
+    }
+    else {
+        if(rank == 0) { printf("Matrix A is scalar and has %d rows\n", n); };
+    }
+
+    size_t sizeof_v_val = ((AMGX_GET_MODE_VAL(AMGX_VecPrecision, mode) == AMGX_vecDouble))? sizeof(double) : sizeof(float);
+
+    // Potential setup dumb repeats for perf analysis
+    // Repeats just reset the solution to original state and setup/solve again
+    // Typically useful to analyse performance without overheads of a cold start
+    void *x_h;
+    int nrepeats = 1;
+    pidx = findParamIndex(argv, argc, "-r");
+    if(pidx != -1)
+    {
+      nrepeats = atoi(argv[pidx+1]);
+      x_h = malloc(n * block_dimx * sizeof_v_val);
+      AMGX_vector_download(x, x_h);
+
+      if (rank == 0) { printf("Running for %d repeats\n", nrepeats); }
+    }
+
     //free temporary storage
     if (partition_vector != NULL) { free(partition_vector); }
 
-    /* solver setup */
-    //MPI barrier for stability (should be removed in practice to maximize performance)
-    MPI_Barrier(amgx_mpi_comm);
-    AMGX_solver_setup(solver, A);
-    /* solver solve */
-    //MPI barrier for stability (should be removed in practice to maximize performance)
-    MPI_Barrier(amgx_mpi_comm);
-    AMGX_solver_solve(solver, b, x);
-    /* example of how to change parameters between non-linear iterations */
-    //AMGX_config_add_parameters(&cfg, "config_version=2, default:tolerance=1e-12");
-    //AMGX_solver_solve(solver, b, x);
-    /* example of how to replace coefficients between non-linear iterations */
-    //AMGX_matrix_replace_coefficients(A, n, nnz, values, diag);
-    //AMGX_solver_setup(solver, A);
-    //AMGX_solver_solve(solver, b, x);
-    AMGX_solver_get_status(solver, &status);
+    for(int r = 0; r < nrepeats; ++r)
+    {
+        if(r > 0) {
+            // Reset the solution for each repeat
+            AMGX_vector_upload(x, n, block_dimx, x_h);
+        }
+
+        /* solver setup */
+        //MPI barrier for stability (should be removed in practice to maximize performance)
+        MPI_Barrier(amgx_mpi_comm);
+        AMGX_solver_setup(solver, A);
+        /* solver solve */
+        //MPI barrier for stability (should be removed in practice to maximize performance)
+        MPI_Barrier(amgx_mpi_comm);
+        AMGX_solver_solve(solver, b, x);
+        /* example of how to change parameters between non-linear iterations */
+        //AMGX_config_add_parameters(&cfg, "config_version=2, default:tolerance=1e-12");
+        //AMGX_solver_solve(solver, b, x);
+        /* example of how to replace coefficients between non-linear iterations */
+        //AMGX_matrix_replace_coefficients(A, n, nnz, values, diag);
+        //AMGX_solver_setup(solver, A);
+        //AMGX_solver_solve(solver, b, x);
+        AMGX_solver_get_status(solver, &status);
+        if(status == AMGX_SOLVE_DIVERGED) {
+            print_callback("***Solver Diverged\n", 0);
+        }
+        else if(status == AMGX_SOLVE_NOT_CONVERGED) {
+            print_callback("***Solver Did Not Converge\n", 0);
+        }
+        else if(status == AMGX_SOLVE_FAILED) {
+            print_callback("***Solver Failed\n", 0);
+        }
+    }
     /* example of how to get (the local part of) the solution */
     //int sizeof_v_val;
     //sizeof_v_val = ((NVAMG_GET_MODE_VAL(NVAMG_VecPrecision, mode) == NVAMG_vecDouble))? sizeof(double): sizeof(float);
@@ -386,5 +428,5 @@ int main(int argc, char **argv)
     amgx_libclose(lib_handle);
 #endif
     MPI_Finalize();
-    return status;
+    return 0;
 }

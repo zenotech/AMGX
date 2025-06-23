@@ -1,29 +1,6 @@
-/* Copyright (c) 2013-2017, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// SPDX-FileCopyrightText: 2013 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
 #include <global_thread_handle.h>
 #include <iostream>
@@ -82,14 +59,6 @@ MemoryPool::MemoryPool(size_t max_block_size, size_t page_size, size_t max_size)
     , m_recently_merged(false)
 {
     //initializeCriticalSection(&m_mutex2);
-
-#ifdef USE_CUDAMALLOCASYNC
-    int device;
-    cudaGetDevice(&device);
-    cudaDeviceGetMemPool(&m_mem_pool, device);
-    uint64_t max_threshold = std::numeric_limits<uint64_t>::max();
-    cudaMemPoolSetAttribute(m_mem_pool, cudaMemPoolAttrReleaseThreshold, &max_threshold);
-#endif
 }
 
 MemoryPool::~MemoryPool()
@@ -469,8 +438,26 @@ struct MemoryManager
         , m_use_device_pool(false)
         , m_alloc_scaling_factor(0)
         , m_alloc_scaling_threshold(16 * 1024 * 1024)
+#ifdef USE_CUDAMALLOCASYNC
+        , m_use_cudamallocasync(false)
+#endif
     {
         //initializeCriticalSection(&m_mutex);
+
+#ifdef USE_CUDAMALLOCASYNC
+    int device;
+    cudaGetDevice(&device);
+    int deviceSupportsMemoryPools;
+    cudaDeviceGetAttribute(&deviceSupportsMemoryPools, cudaDevAttrMemoryPoolsSupported, device);
+    if (deviceSupportsMemoryPools)
+    {
+        m_use_cudamallocasync = true;
+        cudaMemPool_t mem_pool;
+        cudaDeviceGetMemPool(&mem_pool, device);
+        uint64_t max_threshold = std::numeric_limits<uint64_t>::max();
+        cudaMemPoolSetAttribute(mem_pool, cudaMemPoolAttrReleaseThreshold, &max_threshold);
+    }
+#endif
     }
 
     // Dtor.
@@ -494,6 +481,12 @@ struct MemoryManager
         }
 
         return new_size;
+    }
+
+    // Query whether the device pool is a native pool
+    bool uses_cudamallocasync()
+    {
+        return m_use_cudamallocasync;
     }
 
     // Mutex to make functions thread-safe.
@@ -538,6 +531,9 @@ struct MemoryManager
     size_t m_alloc_scaling_factor;
     // Scaling threshold.
     size_t m_alloc_scaling_threshold;
+
+    // whether the device pool is a native pool
+    bool m_use_cudamallocasync;
 };
 
 void MemoryManager::sync_pinned_pool(PinnedMemoryPool *pool)
@@ -846,11 +842,14 @@ cudaError_t cudaFreeHost(void *ptr)
 
 cudaError_t cudaMallocAsync(void **ptr, size_t size, cudaStream_t stream)
 {
+    MemoryManager &manager = MemoryManager::get_instance();
+
 #ifdef USE_CUDAMALLOCASYNC
-
-    return ::cudaMallocAsync(ptr, size, stream);
-
-#else
+    if (manager.uses_cudamallocasync())
+    {
+        return ::cudaMallocAsync(ptr, size, stream);
+    }
+#endif
 
     AMGX_CPU_PROFILER("cudaMalloc");
 #ifdef AMGX_PRINT_MALLOC_CALL_STACK
@@ -867,7 +866,6 @@ cudaError_t cudaMallocAsync(void **ptr, size_t size, cudaStream_t stream)
     }
 
 #endif
-    MemoryManager &manager = MemoryManager::get_instance();
     DeviceMemoryPool *pool = manager.m_main_device_pool;
     _thread_id thread_id = getCurrentThreadId();
     MemoryManager::DevicePoolMap::iterator it = manager.m_thread_device_pools.find(thread_id);
@@ -956,16 +954,18 @@ cudaError_t cudaMallocAsync(void **ptr, size_t size, cudaStream_t stream)
 
 #endif
     return error;
-#endif
 }
 
 cudaError_t cudaFreeAsync(void *ptr, cudaStream_t stream)
 {
+    MemoryManager &manager = MemoryManager::get_instance();
+
 #ifdef USE_CUDAMALLOCASYNC
-
-    return ::cudaFreeAsync(ptr, stream);
-
-#else
+    if (manager.uses_cudamallocasync())
+    {
+        return ::cudaFreeAsync(ptr, stream);
+    }
+#endif
 
     AMGX_CPU_PROFILER("cudaFreeAsync");
 #ifdef AMGX_PRINT_MALLOC_CALL_STACK
@@ -989,7 +989,6 @@ cudaError_t cudaFreeAsync(void *ptr, cudaStream_t stream)
         return cudaSuccess;
     }
 
-    MemoryManager &manager = MemoryManager::get_instance();
     _thread_id thread_id = getCurrentThreadId();
 #ifdef AMGX_PRINT_MEMORY_INFO
     bool print_async = false, print_fallback = false;
@@ -1073,7 +1072,6 @@ cudaError_t cudaFreeAsync(void *ptr, cudaStream_t stream)
 
 #endif
     return status;
-#endif
 }
 
 void cudaFreeWait()

@@ -1,29 +1,6 @@
-/* Copyright (c) 2011-2017, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// SPDX-FileCopyrightText: 2011 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
 #include "unit_test.h"
 #include "core.h"
@@ -560,7 +537,7 @@ void test_selectors(Matrix<T_Config> &A, AMG_Config &cfg, const std::string &cfg
         selector = NULL;
         UNITTEST_ASSERT_EXCEPTION_START;
         PrintOnFail("%s : Matrix properties: blocksize = %d, diag_prop = %d\n", iter->first.c_str(), A.get_block_dimy(), (A.hasProps(DIAG) ? 1 : 0));
-        selector = iter->second->create();
+        selector = iter->second->create(cfg, "default");
         UNITTEST_ASSERT_TRUE(strength != NULL);
 
         if (selector != NULL)
@@ -598,7 +575,7 @@ void test_interpolators(Resources *res, Matrix<T_Config> &A, AMG_Config &cfg, co
     //compute strong connections and weights
     double max_row_sum = cfg.getParameter<double>("max_row_sum", cfg_scope);
     Strength<T_Config> *strength = strengthf->create(cfg, cfg_scope);
-    classical::Selector<T_Config> *selector = selectorf->create();
+    classical::Selector<T_Config> *selector = selectorf->create(cfg, cfg_scope);
     strength->computeStrongConnectionsAndWeights(A, s_con, weights, max_row_sum);
     selector->markCoarseFinePoints(A, weights, s_con, cf_map, scratch);
     Interpolator<T_Config> *interpolator;

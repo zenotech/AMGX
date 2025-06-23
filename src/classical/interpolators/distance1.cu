@@ -1,29 +1,6 @@
-/* Copyright (c) 2011-2017, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// SPDX-FileCopyrightText: 2011 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
 #include <thrust/transform.h>
 #include <thrust/transform_scan.h>
@@ -150,11 +127,7 @@ struct compute_weights
     inline
     int get_thread_id( ) const
     {
-#if( THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_OMP )
-        return omp_get_thread_num( );
-#else
         return 0;
-#endif
     }
 
     // Operator to find the weights.
@@ -296,8 +269,7 @@ void Distance1_Interpolator<TemplateConfig<AMGX_host, t_vecPrec, t_matPrec, t_in
     IntVector &cf_map,
     BVector &are_sc,
     IntVector &wk,
-    Matrix_h &P,
-    void *amg )
+    Matrix_h &P)
 {
     // The diagonal of A.
     VVector diag( A.get_num_rows() );
@@ -333,21 +305,8 @@ void Distance1_Interpolator<TemplateConfig<AMGX_host, t_vecPrec, t_matPrec, t_in
                             P.row_offsets.begin( ) );
     cudaCheckError();
     // For each row we compute the weights.
-#if( THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_OMP )
-    typedef IntVector IntArray1d;
-    int nthreads = omp_get_max_threads( );
-    size_t sz = nthreads * sizeof( IntArray1d );
-    IntArray1d *edges_markers = reinterpret_cast<IntArray1d *>( ::operator new ( sz ) );
-
-    for ( int i = 0 ; i < nthreads ; ++i )
-    {
-        new (edges_markers + i) IntArray1d( A.get_num_rows(), -1 );
-    }
-
-#else
     IntVector edges_markers_on_stack( A.get_num_rows(), -1 );
     IntVector *edges_markers = &edges_markers_on_stack;
-#endif
     detail::compute_weights<Matrix_h> compute_fct( A, diag, are_sc, cf_map, edges_markers, P );
 
     amgx::thrust::for_each( amgx::thrust::host,
@@ -355,15 +314,6 @@ void Distance1_Interpolator<TemplateConfig<AMGX_host, t_vecPrec, t_matPrec, t_in
                       amgx::thrust::make_counting_iterator<int>( A.get_num_rows() ),
                       compute_fct );
     cudaCheckError();
-#if( THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_OMP )
-
-    for ( int i = 0 ; i < nthreads ; ++i )
-    {
-        (edges_markers + i)->~IntArray1d( );
-    }
-
-    ::operator delete ( edges_markers );
-#endif
 }
 
 /*************************************************************************
@@ -831,8 +781,7 @@ void Distance1_Interpolator<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_
         IntVector &cf_map,
         BVector &s_con,
         IntVector &scratch,
-        Matrix_d &P,
-        void *amg)
+        Matrix_d &P)
 {
     typedef typename Matrix_d::index_type IndexType;
     typedef typename Matrix_d::value_type ValueType;
@@ -921,14 +870,13 @@ void Distance1_InterpolatorBase<T_Config>::generateInterpolationMatrix(Matrix<T_
         IntVector &cf_map,
         BVector &s_con,
         IntVector &scratch,
-        Matrix<T_Config> &P,
-        void *amg)
+        Matrix<T_Config> &P)
 {
     P.set_initialized(0);
 
     if (A.get_block_size() == 1)
     {
-        generateInterpolationMatrix_1x1(A, cf_map, s_con, scratch, P, amg);
+        generateInterpolationMatrix_1x1(A, cf_map, s_con, scratch, P);
     }
     else
     {

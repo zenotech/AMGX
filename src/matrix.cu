@@ -1,29 +1,6 @@
-/* Copyright (c) 2011-2017, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// SPDX-FileCopyrightText: 2011 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
 #include <matrix.h>
 #include <cutil.h>
@@ -296,7 +273,7 @@ Matrix< TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indPrec> >::print(ch
         if (this->hasProps(DIAG, this->props))
         {
             //matrix might be non-square so take std::min of # of rows and cols
-            tnnz += std::min(this->get_num_rows(), this->get_num_cols());
+            tnnz += std::min(this->get_num_rows(), this->get_num_cols()) * this->get_block_size();
         }
 
         auto trafI = [&](auto const &I, auto const &i) { return I *  this->get_block_dimy() + i + 1; };
@@ -305,6 +282,12 @@ Matrix< TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indPrec> >::print(ch
         fprintf(fid, "%%%%MatrixMarket matrix coordinate real general\n");
         fprintf(fid, "%% %s\n", s);
         fprintf(fid, "%d %d %d\n", this->get_num_rows() * this->get_block_dimx(), this->get_num_cols() * this->get_block_dimy(), tnnz);
+
+        IVector_h this_row_offsets(this->row_offsets.size()); this_row_offsets = this->row_offsets;
+        IVector_h this_col_indices(this->col_indices.size()); this_col_indices = this->col_indices;
+        MVector_h this_values(this->values.size()); this_values = this->values;
+
+        int const bsSquared = this->get_block_dimx() * this->get_block_dimy();
 
         for (i = printRowsStart; i < printRowsEnd; i++)
         {
@@ -316,7 +299,7 @@ Matrix< TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indPrec> >::print(ch
                     {
                         for (xdim = 0; xdim < this->get_block_dimx(); xdim++)
                         {
-                            a = this->values[this->diag[i] * this->get_block_dimx() * this->get_block_dimy() + this->get_block_dimy() * ydim + xdim];
+                            a = this_values[this->diag[i] * bsSquared + this->get_block_dimy() * ydim + xdim];
                             fprintf(fid, "%d %d ", trafI(i, ydim), trafI(i, xdim));
                             types::util<value_type>::fprintf(fid, "%20.16f", a);
                             fprintf(fid, "\n");
@@ -324,13 +307,13 @@ Matrix< TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indPrec> >::print(ch
                     }
                 }
 
-                for (ii = this->row_offsets[i]; ii < this->row_offsets[i + 1]; ii++)
+                for (ii = this_row_offsets[i]; ii < this_row_offsets[i + 1]; ii++)
                 {
-                    j = this->col_indices[ii];
+                    j = this_col_indices[ii];
 
                     for (xdim = 0; xdim < this->get_block_dimx(); xdim++)
                     {
-                        a = this->values[ii * this->get_block_dimx() * this->get_block_dimy() + this->get_block_dimy() * ydim + xdim];
+                        a = this_values[ii * bsSquared + this->get_block_dimy() * ydim + xdim];
                         fprintf(fid, "%d %d ", trafI(i, ydim), trafJ(j, xdim));
                         types::util<value_type>::fprintf(fid, "%20.16f", a);
                         fprintf(fid, "\n");
@@ -1213,8 +1196,7 @@ void reorderElementsDeviceCSR(INDEX_TYPE num_rows,
                               T *values,
                               INDEX_TYPE block_size)
 {
-    amgx::thrust::device_ptr<INDEX_TYPE> dev_ptr = amgx::thrust::device_pointer_cast(row_offsets);
-    INDEX_TYPE max_row_length = std::max(1, thrust_wrapper::transform_reduce<AMGX_device>(dev_ptr, dev_ptr + num_rows, row_length<INDEX_TYPE>(), 0, amgx::thrust::maximum<INDEX_TYPE>()));
+    INDEX_TYPE max_row_length = std::max(1, thrust_wrapper::transform_reduce<AMGX_device>(row_offsets, row_offsets + num_rows, row_length<INDEX_TYPE>(), 0, amgx::thrust::maximum<INDEX_TYPE>()));
     //TODO: optimise this in terms of storage
     INDEX_TYPE storage_space = 100 * 1024 * 1024 * sizeof(T) / sizeof(cuDoubleComplex); // because we allocate as for cuComplex
     INDEX_TYPE blocks = 1500 < storage_space / (max_row_length * block_size * sizeof(T)) ? 1500 : storage_space / (max_row_length * block_size * sizeof(T));

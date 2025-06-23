@@ -46,7 +46,7 @@ IF(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build, options are Debug Release Profile RelWithTraces" FORCE)
 ENDIF(NOT CMAKE_BUILD_TYPE)
 
-find_package(CUDAToolkit 10.0 REQUIRED)
+find_package(CUDAToolkit 11.0 REQUIRED)
 
 # update/define the compilation flags.
 IF(WIN32)
@@ -71,8 +71,6 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   endif()
 endif()
 
-FIND_PACKAGE(OpenMP)
-
 set(CMAKE_C_FLAGS_PROFILE "${CMAKE_C_FLAGS_RELEASE}" CACHE STRING "" FORCE)
 set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}" CACHE STRING "" FORCE)
 set(CMAKE_EXE_LINKER_FLAGS_PROFILE "${CMAKE_EXE_LINKER_FLAGS_RELEASE}" CACHE STRING "" FORCE)
@@ -85,11 +83,6 @@ set(CMAKE_C_FLAGS_RELWITHTRACES "${CMAKE_C_FLAGS_RELEASE}" CACHE STRING "" FORCE
 set(CMAKE_CXX_FLAGS_RELWITHTRACES "${CMAKE_CXX_FLAGS_RELEASE}" CACHE STRING "" FORCE)
 set(CMAKE_EXE_LINKER_FLAGS_RELWITHTRACES "${CMAKE_EXE_LINKER_FLAGS_RELEASE}" CACHE STRING "" FORCE)
 set(CMAKE_SHARED_LINKER_FLAGS_RELWITHTRACES "${CMAKE_SHARED_LINKER_FLAGS_RELEASE}" CACHE STRING "" FORCE)
-
-if (OPENMP_FOUND)
-    set (CMAKE_C_FLAGS ${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS})
-    set (CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
-endif()
 
 # install paths
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -200,37 +193,16 @@ set(CUDA_HOST_COMPILATION_CPP ON)
 #if compiling against CUDA Toolkit 12.x +
 IF(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 12.0.0)
 
-  SET(CUDA_ALLOW_ARCH "60;70;80;90")
-
-  # Use the generic cuSPARSE interfaces available from 10.1 on Linux, cusparseSpGEMM from 11.0
-  SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}
-      -DDISABLE_MIXED_PRECISION
-      -DCUSPARSE_GENERIC_INTERFACES
-      -DCUSPARSE_USE_GENERIC_SPGEMM)
+  SET(CUDA_ALLOW_ARCH "70;80;90")
 
 ELSEIF(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 11.0.0)
 
-  SET(CUDA_ALLOW_ARCH "60;70;80")
+  SET(CUDA_ALLOW_ARCH "70;80")
 
-  # Use the generic cuSPARSE interfaces available from 10.1 on Linux, cusparseSpGEMM from 11.0
-  SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}
-      -DDISABLE_MIXED_PRECISION
-      -DCUSPARSE_GENERIC_INTERFACES
-      -DCUSPARSE_USE_GENERIC_SPGEMM)
+ELSE()
 
-#if compiling against CUDA Toolkit 10.x
-ELSEIF(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 10.0.0)
+  MESSAGE(FATAL_ERROR "Error: CUDA minimum supported version is 11.0.")
 
-  SET(CUDA_ALLOW_ARCH "35;52;60;70")
-
-  IF(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 10.1.0)
-
-      # Disable mixed precision for CUDA 10.1+
-      SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} 
-          -DDISABLE_MIXED_PRECISION 
-          -DCUSPARSE_GENERIC_INTERFACES)
-
-  ENDIF()
 ENDIF()
 
 if(DEFINED CUDA_ARCH)
@@ -259,7 +231,7 @@ thrust_create_target(Thrust)
 # Add the CXX flags to the host set of CUDA flags
 string(REPLACE ";" " " CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 string(REPLACE ";" " " CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -Xcompiler ${CMAKE_CXX_FLAGS})
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -Xcompiler ${CMAKE_CXX_FLAGS})
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -DTHRUST_CUB_WRAPPED_NAMESPACE=amgx)
 
 add_library(amgx_libs OBJECT "")
@@ -290,8 +262,8 @@ IF (WIN32)
   target_link_libraries(amgx CUDA::cublas CUDA::cusparse CUDA::cusolver)
   target_link_libraries(amgxsh CUDA::cublas CUDA::cusparse CUDA::cusolver)
 ELSE (WIN32)
-  target_link_libraries(amgx CUDA::cublas CUDA::cusparse CUDA::cusolver CUDA::nvToolsExt m pthread)
-  target_link_libraries(amgxsh CUDA::cublas CUDA::cusparse CUDA::cusolver CUDA::nvToolsExt m pthread)
+  target_link_libraries(amgx CUDA::cublas CUDA::cusparse CUDA::cusolver m pthread)
+  target_link_libraries(amgxsh CUDA::cublas CUDA::cusparse CUDA::cusolver m pthread)
 ENDIF(WIN32)
 
 if(MPI_FOUND)

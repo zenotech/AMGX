@@ -1,29 +1,6 @@
-/* Copyright (c) 2011-2017, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// SPDX-FileCopyrightText: 2011 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
 #include <classical/interpolators/distance2.h>
 #include <classical/interpolators/common.h>
@@ -344,8 +321,7 @@ void Distance2_Interpolator<TemplateConfig<AMGX_host, t_vecPrec, t_matPrec, t_in
         IntVector &cf_map,
         BVector &s_con,
         IntVector &scratch,
-        Matrix_h &P,
-        void *amg)
+        Matrix_h &P)
 {
     if (!A.is_matrix_singleGPU())
     {
@@ -600,11 +576,8 @@ void Distance2_Interpolator<TemplateConfig<AMGX_host, t_vecPrec, t_matPrec, t_in
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace distance2_sm35
-{
-
 #include <sm_utils.inl>
-#include <hash_containers_sm35.inl> // Included inside the namespace to solve name colisions.
+#include <hash_containers_detail.inl> // Included inside the namespace to solve name colisions.
 
 __device__ __forceinline__ int get_work( int *queue, int warp_id )
 {
@@ -617,28 +590,6 @@ __device__ __forceinline__ int get_work( int *queue, int warp_id )
 
     return utils::shfl( offset, 0 );
 }
-
-} // namespace distance2_sm35
-
-namespace distance2_sm70
-{
-
-#include <sm_utils.inl>
-#include <hash_containers_sm70.inl> // Included inside the namespace to solve name colisions.
-
-__device__ __forceinline__ int get_work( int *queue, int warp_id )
-{
-    int offset = -1;
-
-    if ( utils::lane_id() == 0 )
-    {
-        offset = atomicAdd( queue, 1 );
-    }
-
-    return utils::shfl( offset, 0 );
-}
-
-} // namespace distance2_sm70
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -925,17 +876,9 @@ compute_c_hat_kernel( int A_num_rows,
     // First threads load the row IDs of A needed by the CTA...
     int a_row_id = blockIdx.x * NUM_WARPS + warp_id;
     // Create local storage for the set.
-#if __CUDA_ARCH__ >= 700
-    distance2_sm70::Hash_set<int, SMEM_SIZE, 4, WARP_SIZE> set( &s_keys[warp_id * SMEM_SIZE], &g_keys[a_row_id * gmem_size], gmem_size );
-#else
-    distance2_sm35::Hash_set<int, SMEM_SIZE, 4, WARP_SIZE> set( &s_keys[warp_id * SMEM_SIZE], &g_keys[a_row_id * gmem_size], gmem_size );
-#endif
+    Hash_set<int, SMEM_SIZE, 4, WARP_SIZE> set( &s_keys[warp_id * SMEM_SIZE], &g_keys[a_row_id * gmem_size], gmem_size );
     // Loop over rows of A.
-#if __CUDA_ARCH__ >= 700
-    for ( ; a_row_id < A_num_rows ; a_row_id = distance2_sm70::get_work( wk_work_queue, warp_id ) )
-#else
-    for ( ; a_row_id < A_num_rows ; a_row_id = distance2_sm35::get_work( wk_work_queue, warp_id ) )
-#endif
+    for ( ; a_row_id < A_num_rows ; a_row_id = get_work( wk_work_queue, warp_id ) )
     {
         // Skip coarse rows.
         int coarse_fine_id = cf_map[a_row_id];
@@ -1092,17 +1035,9 @@ compute_c_hat_kernel( int A_num_rows,
     // First threads load the row IDs of A needed by the CTA...
     int a_row_id = blockIdx.x * NUM_WARPS + warp_id;
     // Create local storage for the set.
-#if __CUDA_ARCH__ >= 700
-    distance2_sm70::Hash_set<int, SMEM_SIZE, 4, WARP_SIZE> set( &s_keys[warp_id * SMEM_SIZE], &g_keys[a_row_id * gmem_size], gmem_size );
-#else
-    distance2_sm35::Hash_set<int, SMEM_SIZE, 4, WARP_SIZE> set( &s_keys[warp_id * SMEM_SIZE], &g_keys[a_row_id * gmem_size], gmem_size );
-#endif
+    Hash_set<int, SMEM_SIZE, 4, WARP_SIZE> set( &s_keys[warp_id * SMEM_SIZE], &g_keys[a_row_id * gmem_size], gmem_size );
     // Loop over rows of A.
-#if __CUDA_ARCH__ >= 700
-    for ( ; a_row_id < A_num_rows ; a_row_id = distance2_sm70::get_work( wk_work_queue, warp_id ) )
-#else
-    for ( ; a_row_id < A_num_rows ; a_row_id = distance2_sm35::get_work( wk_work_queue, warp_id ) )
-#endif
+    for ( ; a_row_id < A_num_rows ; a_row_id = get_work( wk_work_queue, warp_id ) )
     {
         // Skip coarse rows.
         int coarse_fine_id = cf_map[a_row_id];
@@ -1273,17 +1208,9 @@ compute_inner_sum_kernel( const int A_num_rows,
     // First threads load the row IDs of A needed by the CTA...
     int a_row_id = blockIdx.x * NUM_WARPS + warp_id;
     // Create local storage for the set.
-#if __CUDA_ARCH__ >= 700
-    distance2_sm70::Hash_set<int, SMEM_SIZE, 4, WARP_SIZE> set( &s_keys[warp_id * SMEM_SIZE], &g_keys[a_row_id * gmem_size], gmem_size );
-#else
-    distance2_sm35::Hash_set<int, SMEM_SIZE, 4, WARP_SIZE> set( &s_keys[warp_id * SMEM_SIZE], &g_keys[a_row_id * gmem_size], gmem_size );
-#endif
+    Hash_set<int, SMEM_SIZE, 4, WARP_SIZE> set( &s_keys[warp_id * SMEM_SIZE], &g_keys[a_row_id * gmem_size], gmem_size );
     // Loop over rows of A.
-#if __CUDA_ARCH__ >= 700
-    for ( ; a_row_id < A_num_rows ; a_row_id = distance2_sm70::get_work( wk_work_queue, warp_id ) )
-#else
-    for ( ; a_row_id < A_num_rows ; a_row_id = distance2_sm35::get_work( wk_work_queue, warp_id ) )
-#endif
+    for ( ; a_row_id < A_num_rows ; a_row_id = get_work( wk_work_queue, warp_id ) )
     {
         // Skip coarse rows.
         int coarse_fine_id = cf_map[a_row_id];
@@ -1471,17 +1398,9 @@ compute_inner_sum_kernel( const int A_num_rows,
     // First threads load the row IDs of A needed by the CTA...
     int a_row_id = blockIdx.x * NUM_WARPS + warp_id;
     // Create local storage for the set.
-#if __CUDA_ARCH__ >= 700
-    distance2_sm70::Hash_set<int, SMEM_SIZE, 4, WARP_SIZE> set( &s_keys[warp_id * SMEM_SIZE], &g_keys[a_row_id * gmem_size], gmem_size );
-#else
-    distance2_sm35::Hash_set<int, SMEM_SIZE, 4, WARP_SIZE> set( &s_keys[warp_id * SMEM_SIZE], &g_keys[a_row_id * gmem_size], gmem_size );
-#endif
+    Hash_set<int, SMEM_SIZE, 4, WARP_SIZE> set( &s_keys[warp_id * SMEM_SIZE], &g_keys[a_row_id * gmem_size], gmem_size );
     // Loop over rows of A.
-#if __CUDA_ARCH__ >= 700
-    for ( ; a_row_id < A_num_rows ; a_row_id = distance2_sm70::get_work( wk_work_queue, warp_id ) )
-#else
-    for ( ; a_row_id < A_num_rows ; a_row_id = distance2_sm35::get_work( wk_work_queue, warp_id ) )
-#endif
+    for ( ; a_row_id < A_num_rows ; a_row_id = get_work( wk_work_queue, warp_id ) )
     {
         // Skip coarse rows.
         int coarse_fine_id = cf_map[a_row_id];
@@ -1681,25 +1600,13 @@ compute_interp_weight_kernel( const int A_num_rows,
     // First threads load the row IDs of A needed by the CTA...
     int a_row_id = blockIdx.x * NUM_WARPS + warp_id;
     // Create local storage for the set.
-#if __CUDA_ARCH__ >= 700
-    distance2_sm70::Hash_map<int, Value_type, SMEM_SIZE, 4, WARP_SIZE> map( &s_keys[warp_id * SMEM_SIZE],
+    Hash_map<int, Value_type, SMEM_SIZE, 4, WARP_SIZE> map( &s_keys[warp_id * SMEM_SIZE],
             &g_keys[a_row_id * gmem_size],
             &s_vals[warp_id * SMEM_SIZE],
             &g_vals[a_row_id * gmem_size],
             gmem_size );
-#else
-    distance2_sm35::Hash_map<int, Value_type, SMEM_SIZE, 4, WARP_SIZE> map( &s_keys[warp_id * SMEM_SIZE],
-            &g_keys[a_row_id * gmem_size],
-            &s_vals[warp_id * SMEM_SIZE],
-            &g_vals[a_row_id * gmem_size],
-            gmem_size );
-#endif
     // Loop over rows of A.
-#if __CUDA_ARCH__ >= 700
-    for ( ; a_row_id < A_num_rows ; a_row_id = distance2_sm70::get_work( wk_work_queue, warp_id ) )
-#else
-    for ( ; a_row_id < A_num_rows ; a_row_id = distance2_sm35::get_work( wk_work_queue, warp_id ) )
-#endif
+    for ( ; a_row_id < A_num_rows ; a_row_id = get_work( wk_work_queue, warp_id ) )
     {
         int coarse_fine_id = cf_map[a_row_id];
 
@@ -1997,9 +1904,10 @@ void Distance2_Interpolator<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_
         IntVector &cf_map,
         BVector &s_con,
         IntVector &scratch,
-        Matrix_d &P,
-        void *amg_ptr )
+        Matrix_d &P)
 {
+    nvtxRange gim_nr(__func__);
+
     const int blockSize = 256;
     typedef typename Matrix_d::index_type IndexType;
     typedef typename Matrix_d::value_type ValueType;
@@ -2008,7 +1916,6 @@ void Distance2_Interpolator<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_
     const IndexType *Acolumn_indices = A.col_indices.raw();
     const ValueType *Avalues = A.values.raw();
     const IndexType Anum_rows = (int) A.get_num_rows();
-    typedef AMG<t_vecPrec, t_matPrec, t_indPrec> AMG_Class;
 
     cudaDeviceProp props = getDeviceProperties();
     int grid_size = (props.major >= 7) ? 1024 : 128;
@@ -2328,8 +2235,7 @@ void Distance2_InterpolatorBase<T_Config>::generateInterpolationMatrix(Matrix<T_
         IntVector &cf_map,
         BVector &s_con,
         IntVector &scratch,
-        Matrix<T_Config> &P,
-        void *amg)
+        Matrix<T_Config> &P)
 {
     P.set_initialized(0);
     ViewType oldView = A.currentView();
@@ -2338,7 +2244,7 @@ void Distance2_InterpolatorBase<T_Config>::generateInterpolationMatrix(Matrix<T_
     // If multi-GPU do a 2-ring exchange of cf_map since this is a distance two interpolator
     if (A.get_block_size() == 1)
     {
-        generateInterpolationMatrix_1x1(A, cf_map, s_con, scratch, P, amg);
+        generateInterpolationMatrix_1x1(A, cf_map, s_con, scratch, P);
     }
     else
     {

@@ -1,29 +1,6 @@
-/* Copyright (c) 2011-2019, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// SPDX-FileCopyrightText: 2011 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
 #ifdef _WIN32
 #ifndef AMGX_API_EXPORTS
@@ -84,11 +61,11 @@ AMGX_RC getResourcesFromSolverHandle(AMGX_solver_handle slv, Resources **resourc
 #undef AMGX_CASE_LINE
 
             default:
-                AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_MODE, NULL);
+                AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_MODE);
         }
     }
     AMGX_CATCHES(rc)
-    AMGX_CHECK_API_ERROR(rc, NULL)
+    AMGX_CHECK_API_ERROR_NORSRC(rc)
     return AMGX_RC_OK;
 }
 
@@ -111,12 +88,12 @@ AMGX_RC getResourcesFromMatrixHandle(AMGX_matrix_handle mtx, Resources **resourc
 #undef AMGX_CASE_LINE
 
             default:
-                AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_MODE, NULL);
+                AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_MODE);
         }
     }
 
     AMGX_CATCHES(rc)
-    AMGX_CHECK_API_ERROR(rc, NULL)
+    AMGX_CHECK_API_ERROR_NORSRC(rc)
     return AMGX_RC_OK;
 }
 
@@ -139,12 +116,12 @@ AMGX_RC getResourcesFromVectorHandle(AMGX_vector_handle vec, Resources **resourc
 #undef AMGX_CASE_LINE
 
             default:
-                AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_MODE, NULL);
+                AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_MODE);
         }
     }
 
     AMGX_CATCHES(rc)
-    AMGX_CHECK_API_ERROR(rc, NULL)
+    AMGX_CHECK_API_ERROR_NORSRC(rc)
     return AMGX_RC_OK;
 }
 }
@@ -1519,7 +1496,7 @@ inline AMGX_RC mpi_write_system_distributed(const AMGX_matrix_handle mtx,
 
     if (mtx == NULL && rhs == NULL && sol == NULL)
     {
-        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
     }
 
     MatrixLetterT *mtx_ptr = NULL;
@@ -2020,7 +1997,7 @@ inline AMGX_RC write_system(const AMGX_matrix_handle mtx,
 
     if (mtx == NULL && rhs == NULL && sol == NULL)
     {
-        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
     }
 
     MatrixLetterT *mtx_ptr = NULL;
@@ -2282,7 +2259,7 @@ AMGX_RC write_system_preamble(const AMGX_matrix_handle mtx,
 {
     if (mtx == NULL && rhs == NULL && sol == NULL)
     {
-        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
     }
 
     mode = AMGX_unset;
@@ -2293,7 +2270,7 @@ AMGX_RC write_system_preamble(const AMGX_matrix_handle mtx,
 
     if (mtx != NULL)
     {
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         //if (!c_mtx || !c_mtx->is_valid()) return AMGX_RC_BAD_PARAMETERS;
         mode = m_mode = get_mode_from<AMGX_matrix_handle>(mtx);
     }
@@ -2301,7 +2278,7 @@ AMGX_RC write_system_preamble(const AMGX_matrix_handle mtx,
     if (rhs != NULL)
     {
         if (resources == NULL)
-            AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromVectorHandle(rhs, &resources)), NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromVectorHandle(rhs, &resources)))
             //no need to check validity here,
             //it's done elsewhere via:
             //get_mode_object_from<...>(...)->
@@ -2315,7 +2292,7 @@ AMGX_RC write_system_preamble(const AMGX_matrix_handle mtx,
     if (sol != NULL)
     {
         if (resources == NULL)
-            AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromVectorHandle(sol, &resources)), NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromVectorHandle(sol, &resources)))
             //no need to check validity here,
             //it's done elsewhere via:
             //get_mode_object_from<...>(...)->
@@ -2354,7 +2331,7 @@ AMGX_RC read_system_preamble(const AMGX_matrix_handle mtx,
 {
     if (mtx == NULL && rhs == NULL && sol == NULL)
     {
-        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
     }
 
     mode = AMGX_unset;
@@ -2363,12 +2340,12 @@ AMGX_RC read_system_preamble(const AMGX_matrix_handle mtx,
 
     if (mtx != NULL)
     {
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         io_config::addProps(io_config::MTX, props);
         mode = get_mode_from<AMGX_matrix_handle>(mtx);
     }
     else if (!try_any)
-        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL) // there are no valid resources without Matrix object
+        AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS) // there are no valid resources without Matrix object
         if (rhs != NULL)
         {
             io_config::addProps(io_config::RHS, props);
@@ -2381,7 +2358,7 @@ AMGX_RC read_system_preamble(const AMGX_matrix_handle mtx,
             if (try_any)
             {
                 if (resources == NULL)
-                    AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromVectorHandle(rhs, &resources)), NULL)
+                    AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromVectorHandle(rhs, &resources)))
                 }
 
             //no need to check validity here,
@@ -2405,7 +2382,7 @@ AMGX_RC read_system_preamble(const AMGX_matrix_handle mtx,
         if (try_any)
         {
             if (resources == NULL)
-                AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromVectorHandle(sol, &resources)), NULL)
+                AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromVectorHandle(sol, &resources)))
             }
 
         //no need to check validity here,
@@ -2470,7 +2447,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         AMGX_CPU_PROFILER( "AMGX_initialize " );
-        AMGX_CHECK_API_ERROR(amgx::initialize(), NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(amgx::initialize());
         return AMGX_RC_OK;
         //return getCAPIerror(amgx::initialize());
     }
@@ -2497,7 +2474,7 @@ extern "C" {
         }
 
         AMGX_CATCHES(rc)
-        //AMGX_CHECK_API_ERROR(rc, NULL);
+        //AMGX_CHECK_API_ERROR_NORSRC(rc);
         //return AMGX_RC_OK;
         return getCAPIerror_x(rc);
     }
@@ -2528,10 +2505,10 @@ extern "C" {
         AMGX_CATCHES(rc)
 
         if (rc != AMGX_OK)
-            AMGX_CHECK_API_ERROR(rc, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(rc)
             //return getCAPIerror(rc);
             else
-                AMGX_CHECK_API_ERROR(err, NULL)
+                AMGX_CHECK_API_ERROR_NORSRC(err)
                 //return getCAPIerror(err);
                 return AMGX_RC_OK;
     }
@@ -2557,11 +2534,11 @@ extern "C" {
         AMGX_CATCHES(rc)
 
         if (rc != AMGX_OK)
-            AMGX_CHECK_API_ERROR(rc, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(rc)
             //return getCAPIerror(rc);
             else
             {
-                AMGX_CHECK_API_ERROR(err, NULL);
+                AMGX_CHECK_API_ERROR_NORSRC(err);
             }
 
         //return getCAPIerror(err);
@@ -2590,11 +2567,11 @@ extern "C" {
         AMGX_CATCHES(rc)
 
         if (rc != AMGX_OK)
-            AMGX_CHECK_API_ERROR(rc, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(rc)
             //return getCAPIerror(rc);
             else
             {
-                AMGX_CHECK_API_ERROR(err, NULL);
+                AMGX_CHECK_API_ERROR_NORSRC(err);
             }
 
         //return getCAPIerror(err);
@@ -2626,10 +2603,10 @@ extern "C" {
         AMGX_CATCHES(rc)
 
         if (rc != AMGX_OK)
-            AMGX_CHECK_API_ERROR(rc, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(rc)
             //return getCAPIerror(rc);
             else
-                AMGX_CHECK_API_ERROR(err, NULL)
+                AMGX_CHECK_API_ERROR_NORSRC(err)
                 //return getCAPIerror(err);
                 return AMGX_RC_OK;
     }
@@ -2725,11 +2702,11 @@ extern "C" {
         AMGX_TRIES()
         {
             if (!remove_managed_object<AMGX_config_handle, AMG_Configuration>(cfg_h))
-                AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_MODE, NULL)
+                AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_MODE)
         }
 
         AMGX_CATCHES(rc)
-        AMGX_CHECK_API_ERROR(rc, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(rc);
         return AMGX_RC_OK;
     }
 
@@ -2750,7 +2727,7 @@ extern "C" {
 
             if (!c_r.wrapped())
             {
-                AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+                AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
             }
 
             resources = c_r.wrapped().get();
@@ -2784,7 +2761,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_solver_solve " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)));
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -2851,7 +2828,7 @@ extern "C" {
         //device deallocator must be invoked
         //to free device resources
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)), NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)));
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -2885,7 +2862,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_solver_setup " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)), NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)));
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -2919,7 +2896,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_solver_resetup " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)), NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)));
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -2953,7 +2930,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_solver_solve " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)), NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)));
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -2985,7 +2962,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_solver_solve_with_0_initial_guess " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)), NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)));
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -3026,7 +3003,7 @@ extern "C" {
 
             if (!c_r.wrapped() )
             {
-                AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+                AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
             }
 
             resources = c_r.wrapped().get();
@@ -3065,7 +3042,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_solver_solve " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)));
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -3097,7 +3074,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_matrix_destroy " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)));
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -3140,7 +3117,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_matrix_upload_all " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         // should change to the convert(). this routine will catch possible memory exceptions and return corresponding errors. temporary catch.
         AMGX_ERROR rc = AMGX_OK;
         AMGX_RC rc0 = AMGX_RC_OK;
@@ -3184,7 +3161,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_matrix_replace_coefficients " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         AMGX_ERROR rc = AMGX_OK;
         AMGX_RC rc0 = AMGX_RC_OK;
 
@@ -3221,7 +3198,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_matrix_get_size " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -3281,7 +3258,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_matrix_attach_geometry " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         int dimension = (geoz == NULL ? 2 : 3);
         AMGX_ERROR rc = AMGX_OK;
 
@@ -3318,7 +3295,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_matrix_attach_coloring " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -3354,7 +3331,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_matrix_sort " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         AMGX_ERROR rc = AMGX_OK;
         AMGX_RC rc0 = AMGX_RC_OK;
 
@@ -3399,7 +3376,7 @@ extern "C" {
         {
             ResourceW c_r(rsc);
 
-            if (!c_r.wrapped()) { AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL); }
+            if (!c_r.wrapped()) { AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS); }
 
             resources = c_r.wrapped().get();
             cudaSetDevice(resources->getDevice(0));
@@ -3440,7 +3417,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_vector_destroy " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)))
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -3482,7 +3459,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_vector_upload " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)))
         AMGX_ERROR rc = AMGX_OK;
         AMGX_RC rc0 = AMGX_RC_OK;
 
@@ -3525,7 +3502,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_vector_set_zero " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)))
         AMGX_ERROR rc = AMGX_OK;
         AMGX_RC rc0 = AMGX_RC_OK;
 
@@ -3568,7 +3545,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)))
         AMGX_ERROR rc = AMGX_OK;
         AMGX_RC rc0 = AMGX_RC_OK;
 
@@ -3648,7 +3625,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_vector_download " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)))
         //if (!c_vec || !c_vec->is_valid()) return AMGX_RC_BAD_PARAMETERS;
         AMGX_ERROR rc = AMGX_OK;
         AMGX_RC rc0 = AMGX_RC_OK;
@@ -3692,7 +3669,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_vector_get_size " );
         Resources *resources;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromVectorHandle(vec, &resources)))
         //if (!c_vec || !c_vec->is_valid()) return AMGX_RC_BAD_PARAMETERS;
         AMGX_ERROR rc = AMGX_OK;
         AMGX_RC rc0 = AMGX_RC_OK;
@@ -3771,7 +3748,7 @@ extern "C" {
     {
         nvtxRange nvrf(__func__);
 
-        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
         return AMGX_RC_OK;
     }
 #endif
@@ -3819,7 +3796,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_vector_get_iterations_number " );
         Resources *resources = NULL;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)))
         //if (!c_solver || !c_solver->is_valid()) return AMGX_RC_BAD_PARAMETERS;
         AMGX_ERROR rc = AMGX_OK;
 
@@ -3855,7 +3832,7 @@ extern "C" {
 
         AMGX_CPU_PROFILER( "AMGX_vector_get_iteration_residual " );
         Resources *resources = NULL;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)))
         //if (!c_solver || !c_solver->is_valid()) return AMGX_RC_BAD_PARAMETERS;
         *res = -1.;
         AMGX_ERROR rc = AMGX_OK;
@@ -3912,7 +3889,7 @@ extern "C" {
             return AMGX_RC_OK;
         }
         else
-            AMGX_CHECK_API_ERROR(AMGX_ERR_CUDA_FAILURE, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_CUDA_FAILURE)
             return AMGX_RC_OK;
     }
 
@@ -3939,7 +3916,7 @@ extern "C" {
             return AMGX_RC_OK;
         }
         else
-            AMGX_CHECK_API_ERROR(AMGX_ERR_CUDA_FAILURE, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_CUDA_FAILURE)
             return AMGX_RC_OK;
     }
 
@@ -3955,7 +3932,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         Resources *resources = NULL;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromSolverHandle(slv, &resources)))
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -4034,7 +4011,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         Resources *resources = NULL;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         //if (!c_mtx || !c_mtx->is_valid()) return AMGX_RC_BAD_PARAMETERS;
         AMGX_ERROR rc = AMGX_OK;
 
@@ -4115,7 +4092,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         Resources *resources = NULL;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         //if (!c_mtx || !c_mtx->is_valid()) return AMGX_RC_BAD_PARAMETERS;
         AMGX_ERROR rc = AMGX_OK;
 
@@ -4156,7 +4133,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         Resources *resources = NULL;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(matrix, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(matrix, &resources)))
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -4288,7 +4265,7 @@ extern "C" {
     {
         nvtxRange nvrf(__func__);
 
-        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
         return AMGX_RC_OK;
     }
 #endif
@@ -4298,7 +4275,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         Resources *resources = NULL;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         //if (!c_mtx) return AMGX_RC_BAD_PARAMETERS;
         AMGX_ERROR rc = AMGX_OK;
 
@@ -4372,7 +4349,7 @@ extern "C" {
 
             if (!c_r.wrapped())
             {
-                AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+                AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
             }
             else
             {
@@ -4538,7 +4515,7 @@ extern "C" {
 
             if (!c_r.wrapped())
             {
-                AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+                AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
             }
             else
             {
@@ -4710,7 +4687,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         Resources *resources = NULL;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         AMGX_ERROR rc = AMGX_OK;
         std::string solver_scope, solver_value;
         std::string precond_scope, precond_value;
@@ -4775,7 +4752,7 @@ extern "C" {
     {
         nvtxRange nvrf(__func__);
 
-        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
         return AMGX_RC_OK;
     }
 #endif
@@ -4950,19 +4927,19 @@ extern "C" {
     {
         nvtxRange nvrf(__func__);
 
-        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
         return AMGX_RC_OK;
     }
 
     AMGX_RC AMGX_API AMGX_matrix_upload_all_global(AMGX_matrix_handle mtx, const int n_global, const int n, const int nnz, const int block_dimx, const int block_dimy, const int *row_ptrs, const void *col_indices_global, const void *data, const void *diag_data, int allocated_halo_depth, int num_import_rings, const int *partition_vector)
     {
-        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
         return AMGX_RC_OK;
     }
 
     AMGX_RC AMGX_API AMGX_matrix_upload_all_global_int(AMGX_matrix_handle mtx, const int n_global, const int n, const int nnz, const int block_dimx, const int block_dimy, const int *row_ptrs, const void *col_indices_global, const void *data, const void *diag_data, int allocated_halo_depth, int num_import_rings, const int *partition_vector)
     {
-        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
         return AMGX_RC_OK;
     }
 
@@ -4970,7 +4947,7 @@ extern "C" {
     {
         nvtxRange nvrf(__func__);
 
-        AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
         return AMGX_RC_OK;
     }
 #endif
@@ -4980,7 +4957,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         Resources *resources = NULL;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         AMGX_ERROR rc = AMGX_OK;
         AMGX_RC rc0 = AMGX_RC_OK;
 
@@ -5015,7 +4992,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         Resources *resources = NULL;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
         AMGX_ERROR rc = AMGX_OK;
 
         AMGX_TRIES()
@@ -5050,7 +5027,7 @@ extern "C" {
 
         if (rsc == NULL || devices == NULL)
         {
-            AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+            AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
         }
 
         AMGX_ERROR rc = AMGX_OK;
@@ -5065,7 +5042,7 @@ extern "C" {
 
         if (rc != AMGX_OK)
         {
-            AMGX_CHECK_API_ERROR(rc, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(rc)
         }
 
         return AMGX_RC_OK;
@@ -5089,7 +5066,7 @@ extern "C" {
 
         if (rc != AMGX_OK)
         {
-            AMGX_CHECK_API_ERROR(rc, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(rc)
         }
 
         return AMGX_RC_OK;
@@ -5107,7 +5084,7 @@ extern "C" {
         }
 
         AMGX_CATCHES(rc)
-        AMGX_CHECK_API_ERROR(rc, NULL);
+        AMGX_CHECK_API_ERROR_NORSRC(rc);
         return AMGX_RC_OK;
     }
 
@@ -5130,7 +5107,7 @@ extern "C" {
         AMGX_CATCHES(rc);
         if (rc != AMGX_OK)
         {
-            AMGX_CHECK_API_ERROR(rc, NULL);
+            AMGX_CHECK_API_ERROR_NORSRC(rc);
         }
         return AMGX_RC_OK;
     }
@@ -5150,7 +5127,7 @@ extern "C" {
         AMGX_CATCHES(rc);
         if (rc != AMGX_OK)
         {
-            AMGX_CHECK_API_ERROR(rc, NULL);
+            AMGX_CHECK_API_ERROR_NORSRC(rc);
         }
         return AMGX_RC_OK;
     }
@@ -5161,7 +5138,7 @@ extern "C" {
 
         if (dist == NULL || partition_data == NULL)
         {
-            AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+            AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
         }
         typedef CWrapHandle<AMGX_distribution_handle, MatrixDistribution> MatrixDistributionW;
         MatrixDistributionW wrapDist(dist);
@@ -5178,7 +5155,7 @@ extern "C" {
                 mdist.setPartitionVecMap((const int*)partition_data, row_map);
                 break;
             default:
-                AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+                AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
                 break;
         }
         return AMGX_RC_OK;
@@ -5190,7 +5167,7 @@ extern "C" {
 
         if (dist == NULL)
         {
-            AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL);
+            AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS);
         }
         typedef CWrapHandle<AMGX_distribution_handle, MatrixDistribution> MatrixDistributionW;
         MatrixDistributionW wrapDist(dist);
@@ -5273,11 +5250,11 @@ extern "C" {
         {
             case AMGX_GET_PARAMS_DESC_JSON_TO_FILE:
                 // handles all exceptions inside
-                AMGX_CHECK_API_ERROR(AMG_Config::write_parameters_description_json(filename), NULL);
+                AMGX_CHECK_API_ERROR_NORSRC(AMG_Config::write_parameters_description_json(filename));
                 break;
 
             default:
-                AMGX_CHECK_API_ERROR(AMGX_ERR_NOT_IMPLEMENTED, NULL);
+                AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_NOT_IMPLEMENTED);
         }
 
         return AMGX_RC_OK;
@@ -5289,7 +5266,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         if (getTimers().createTimer(label, flags))
-            AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS)
             //return AMGX_RC_BAD_PARAMETERS;
             return AMGX_RC_OK;
     }
@@ -5299,7 +5276,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         if (getTimers().startTimer(label))
-            AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS)
             //return AMGX_RC_BAD_PARAMETERS;
             return AMGX_RC_OK;
     }
@@ -5338,14 +5315,14 @@ extern "C" {
         if (!fin)
         {
             printf("Error opening file '%s'\n", fname);
-            AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS)
             //exit(1);
         }
 
         int n, dimension;
 
         if (2 != fscanf(fin, "%d %d\n", &n, &dimension))
-            AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS)
             //exit(1);
             //errAndExit("Bad format\n");
             *geo_x = (double *)get_c_arr_mem_manager().allocate(n * sizeof(double));
@@ -5358,7 +5335,7 @@ extern "C" {
 
             for (int i = 0; i < n; i ++)
                 if (3 != fscanf(fin, "%lf %lf %lf\n", *geo_x + i, *geo_y + i, *geo_z + i))
-                    AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL)
+                    AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS)
                     //exit(1);
                     //errAndExit("Bad format\n");
                 }
@@ -5366,7 +5343,7 @@ extern "C" {
         {
             for (int i = 0; i < n; i ++)
                 if ( 2 != fscanf(fin, "%lf %lf\n", *geo_x + i, *geo_y + i))
-                    AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL)
+                    AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS)
                     //exit(1);
                     //errAndExit("Bad format\n");
                 }
@@ -5387,19 +5364,19 @@ extern "C" {
         if (!fin)
         {
             printf("Error opening file '%s'\n", fname);
-            AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS)
         }
 
         int n, colors_num;
 
         if (2 != fscanf(fin, "%d %d\n", &n, &colors_num))
-            AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL)
+            AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS)
             //errAndExit("Bad format\n");
             *row_coloring = (int *)get_c_arr_mem_manager().allocate(n * sizeof(int));
 
         for (int i = 0; i < n; i ++)
             if ( 1 != fscanf(fin, "%d\n", *row_coloring + i))
-                AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, NULL)
+                AMGX_CHECK_API_ERROR_NORSRC(AMGX_ERR_BAD_PARAMETERS)
                 //errAndExit("Bad format\n");
                 *colored_rows = n;
 
@@ -5476,7 +5453,7 @@ extern "C" {
         nvtxRange nvrf(__func__);
 
         Resources *resources = NULL;
-        AMGX_CHECK_API_ERROR(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)), NULL)
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
 
 #ifdef AMGX_WITH_MPI
             int nranks;
@@ -5524,6 +5501,53 @@ extern "C" {
         return AMGX_RC_OK;
     }
 
+    AMGX_RC AMGX_matrix_check_diag_dominant(const AMGX_matrix_handle mtx, int* diag_dominant)
+    {
+        nvtxRange nvrf(__func__);
+
+        Resources *resources = NULL;
+        AMGX_CHECK_API_ERROR_NORSRC(getAMGXerror(getResourcesFromMatrixHandle(mtx, &resources)))
+
+#ifdef AMGX_WITH_MPI
+            int nranks;
+            MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+            if(nranks > 1) {
+                std::string err_msg("AMGX_matrix_check_symmetry cannot yet test distributed matrices, please run on 1 rank.\n");
+                amgx_distributed_output(err_msg.c_str(), err_msg.length());
+                AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, resources);    //return AMGX_RC_BAD_PARAMETERS;
+            }
+#endif
+
+        AMGX_ERROR rc = AMGX_OK;
+
+        AMGX_TRIES()
+        {
+            AMGX_Mode mode = get_mode_from(mtx);
+
+            switch (mode)
+            {
+#define AMGX_CASE_LINE(CASE) case CASE: { \
+                    typedef typename TemplateMode<CASE>::Type TConfig; \
+                    typedef CWrapHandle<AMGX_matrix_handle, Matrix<TConfig>> MatrixW; \
+                    MatrixW wrapA(mtx); \
+                    Matrix<TConfig>& A = *wrapA.wrapped(); \
+                    MatrixAnalysis<TConfig> m_ana(&A); \
+                    m_ana.checkDiagDominate(); \
+                    break; \
+                }
+                AMGX_FORALL_BUILDS(AMGX_CASE_LINE)
+                AMGX_FORCOMPLEX_BUILDS(AMGX_CASE_LINE)
+#undef AMGX_CASE_LINE
+
+                default:
+                    return AMGX_RC_BAD_MODE;
+            }
+        }
+
+        AMGX_CATCHES(rc)
+        AMGX_CHECK_API_ERROR(rc, resources)
+        return AMGX_RC_OK;
+    }
     int AMGX_Debug_get_resource_count(AMGX_resources_handle rsc)
     {
         return ((ResourceW *)rsc)->wrapped().use_count();

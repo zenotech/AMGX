@@ -1,29 +1,6 @@
-/* Copyright (c) 2011-2019, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// SPDX-FileCopyrightText: 2011 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -439,11 +416,11 @@ int main(int argc, char **argv)
     if ((pidx = findParamIndex(argv, argc, "-gpu")) != -1)
     {
         /* allocate memory and copy the data to the GPU */
-        CUDA_SAFE_CALL(cudaMallocAsync((void **)&d_x, n * block_dimx * sizeof_v_val, 0));
-        CUDA_SAFE_CALL(cudaMallocAsync((void **)&d_b, n * block_dimy * sizeof_v_val, 0));
-        CUDA_SAFE_CALL(cudaMallocAsync((void **)&d_col_indices, nnz * sizeof(int64_t), 0));
-        CUDA_SAFE_CALL(cudaMallocAsync((void **)&d_row_ptrs, (n + 1)*sizeof(int), 0));
-        CUDA_SAFE_CALL(cudaMallocAsync((void **)&d_values, nnz * block_size * sizeof_m_val, 0));
+        CUDA_SAFE_CALL(cudaMalloc((void **)&d_x, n * block_dimx * sizeof_v_val));
+        CUDA_SAFE_CALL(cudaMalloc((void **)&d_b, n * block_dimy * sizeof_v_val));
+        CUDA_SAFE_CALL(cudaMalloc((void **)&d_col_indices, nnz * sizeof(int64_t)));
+        CUDA_SAFE_CALL(cudaMalloc((void **)&d_row_ptrs, (n + 1)*sizeof(int)));
+        CUDA_SAFE_CALL(cudaMalloc((void **)&d_values, nnz * block_size * sizeof_m_val));
         CUDA_SAFE_CALL(cudaMemcpy(d_x, h_x, n * block_dimx * sizeof_v_val, cudaMemcpyDefault));
         CUDA_SAFE_CALL(cudaMemcpy(d_b, h_b, n * block_dimy * sizeof_v_val, cudaMemcpyDefault));
         CUDA_SAFE_CALL(cudaMemcpy(d_col_indices, h_col_indices, nnz * sizeof(int64_t), cudaMemcpyDefault));
@@ -452,7 +429,7 @@ int main(int argc, char **argv)
 
         if (h_diag != NULL)
         {
-            CUDA_SAFE_CALL(cudaMallocAsync(&d_diag, n * block_size * sizeof_m_val, 0));
+            CUDA_SAFE_CALL(cudaMalloc(&d_diag, n * block_size * sizeof_m_val));
             CUDA_SAFE_CALL(cudaMemcpy(d_diag, h_diag, n * block_size * sizeof_m_val, cudaMemcpyDefault));
         }
 
@@ -614,15 +591,15 @@ int main(int argc, char **argv)
     if ((pidx = findParamIndex(argv, argc, "-gpu")) != -1)
     {
         /* deallocate GPU (device) memory */
-        CUDA_SAFE_CALL(cudaFreeAsync(d_x, 0));
-        CUDA_SAFE_CALL(cudaFreeAsync(d_b, 0));
-        CUDA_SAFE_CALL(cudaFreeAsync(d_row_ptrs, 0));
-        CUDA_SAFE_CALL(cudaFreeAsync(d_col_indices, 0));
-        CUDA_SAFE_CALL(cudaFreeAsync(d_values, 0));
+        CUDA_SAFE_CALL(cudaFree(d_x));
+        CUDA_SAFE_CALL(cudaFree(d_b));
+        CUDA_SAFE_CALL(cudaFree(d_row_ptrs));
+        CUDA_SAFE_CALL(cudaFree(d_col_indices));
+        CUDA_SAFE_CALL(cudaFree(d_values));
 
         if (d_diag != NULL)
         {
-            CUDA_SAFE_CALL(cudaFreeAsync(d_diag, 0));
+            CUDA_SAFE_CALL(cudaFree(d_diag));
         }
     }
     else
