@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2008 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+// SPDX-FileCopyrightText: 2008 - 2025 NVIDIA CORPORATION. All Rights Reserved.
 //
 // SPDX-License-Identifier: BSD-3-Clause
 
@@ -6,6 +6,7 @@
 
 #include <cusp/array1d.h>
 #include <cusp/detail/format_utils.h>
+#include <cusp/detail/functional.h>
 
 #include <thrust/functional.h>
 #include <thrust/reduce.h>
@@ -90,7 +91,7 @@ void coo_add(const Matrix1& A,
 {
     typedef typename Matrix2::value_type ValueType;
 
-    coo_elementwise_transform_simple(A, B, C, amgx::thrust::identity<ValueType>());
+    coo_elementwise_transform_simple(A, B, C, identity_function<ValueType>());
 }
 
 template <typename Matrix1,
