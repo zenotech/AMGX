@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2011 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+// SPDX-FileCopyrightText: 2011 - 2025 NVIDIA CORPORATION. All Rights Reserved.
 //
 // SPDX-License-Identifier: BSD-3-Clause
 
@@ -672,6 +672,7 @@ inline AMGX_ERROR set_solver_with(AMGX_solver_handle slv,
     }
 
     cudaSetDevice(solver.getResources()->getDevice(0));
+    cudaCheckError();
     return (solver.*memf)(A);
 }
 
@@ -703,6 +704,7 @@ inline AMGX_ERROR set_solver_with_shared(AMGX_solver_handle slv,
     }
 
     cudaSetDevice(solver.getResources()->getDevice(0));
+    cudaCheckError();
     return (solver.*memf)(wrapA.wrapped());
 }
 
@@ -744,6 +746,7 @@ inline AMGX_ERROR solve_with(AMGX_solver_handle slv,
     }
 
     cudaSetDevice(solver.getResources()->getDevice(0));
+    cudaCheckError();
     AMGX_ERROR ret = solver.solve(b, x, wrapSolver.last_solve_status(), xIsZero);
     return ret;
 }
@@ -785,6 +788,7 @@ inline AMGX_ERROR matrix_vector_multiply(AMGX_matrix_handle mtx,
     }
 
     cudaSetDevice(resources->getDevice(0));
+    cudaCheckError();
     // latency hiding disable
     /*if (A.getManager() != NULL)
     {
@@ -893,6 +897,7 @@ inline AMGX_ERROR solver_calculate_residual_norm( AMGX_solver_handle slv,
     }
 
     cudaSetDevice(resources->getDevice(0));
+    cudaCheckError();
     solver.getSolverObject()->compute_residual_norm_external(A, v_rhs, v_x, (typename amgx::types::PODTypes<typename VectorLetterT::value_type>::type *)norm_data);
     return AMGX_OK;
 }
@@ -925,6 +930,7 @@ inline AMGX_RC matrix_upload_all(AMGX_matrix_handle mtx,
 
     A.set_initialized(0);
     cudaSetDevice(A.getResources()->getDevice(0));
+    cudaCheckError();
     A.addProps(CSR);
     A.setColsReorderedByColor(false);
     A.delProps(COO);
@@ -940,12 +946,16 @@ inline AMGX_RC matrix_upload_all(AMGX_matrix_handle mtx,
     {
         int _t = A.resize(n, n, nnz, block_dimx, block_dimy);
         cudaMemcpy(A.row_offsets.raw(), row_ptrs, sizeof(int) * (n + 1), cudaMemcpyDefault);
+        cudaCheckError();
         cudaMemcpy(A.col_indices.raw(), col_indices, sizeof(int) * nnz, cudaMemcpyDefault);
+        cudaCheckError();
         cudaMemcpy(A.values.raw(), data, sizeof(ValueType) * nnz * block_dimx * block_dimy, cudaMemcpyDefault);
+        cudaCheckError();
 
         if (diag_data)
         {
             cudaMemcpy(A.values.raw() + A.diagOffset()*A.get_block_size(), diag_data, sizeof(ValueType) * n * block_dimx * block_dimy, cudaMemcpyDefault);
+            cudaCheckError();
         }
         else
         {
@@ -978,6 +988,7 @@ inline AMGX_RC matrix_replace_coefficients(AMGX_matrix_handle mtx,
     MatrixW wrapA(mtx);
     MatrixLetterT &A = *wrapA.wrapped();
     cudaSetDevice(A.getResources()->getDevice(0));
+    cudaCheckError();
     typedef typename MatPrecisionMap<AMGX_GET_MODE_VAL(AMGX_MatPrecision, CASE)>::Type ValueType;
 
     if (A.manager != NULL &&
@@ -1007,6 +1018,7 @@ inline AMGX_RC matrix_replace_coefficients(AMGX_matrix_handle mtx,
         if (data)
         {
             cudaMemcpy(A.values.raw(), (ValueType *)data, sizeof(ValueType) * (nnz * A.get_block_size()), cudaMemcpyDefault);
+            cudaCheckError();
         }
 
         if (diag_data)
@@ -1035,6 +1047,7 @@ inline void matrix_attach_geometry(AMGX_matrix_handle mtx,
     typedef typename Matrix<TConfig>::MVector VVector;
     MatrixLetterT *obj = get_mode_object_from<CASE, Matrix, AMGX_matrix_handle>(mtx);
     cudaSetDevice(obj->getResources()->getDevice(0));
+    cudaCheckError();
     Vector_h hgeo_x, hgeo_y, hgeo_z;
     VVector *geo_x = new VVector;
     VVector *geo_y = new VVector;
@@ -1085,6 +1098,7 @@ inline void matrix_attach_coloring(AMGX_matrix_handle mtx,
     typedef typename Matrix<TConfig_h>::IVector IVector_h;
     MatrixLetterT *obj = get_mode_object_from<CASE, Matrix, AMGX_matrix_handle>(mtx);
     cudaSetDevice(obj->getResources()->getDevice(0));
+    cudaCheckError();
     IVector_h *row_colors = new IVector_h;
     row_colors->resize(num_rows);
 
@@ -1104,6 +1118,7 @@ inline AMGX_RC matrix_sort(AMGX_matrix_handle mtx)
     typedef Matrix<typename TemplateMode<CASE>::Type> MatrixLetterT;
     MatrixLetterT &A = *get_mode_object_from<CASE, Matrix, AMGX_matrix_handle>(mtx);
     cudaSetDevice(A.getResources()->getDevice(0));
+    cudaCheckError();
 
     if (A.get_block_size() == 1)
     {
@@ -1128,6 +1143,7 @@ inline AMGX_RC vector_upload(AMGX_vector_handle vec,
     VectorW wrapV(vec);
     VectorLetterT &v = *wrapV.wrapped();
     cudaSetDevice(v.getResources()->getDevice(0));
+    cudaCheckError();
     v.set_block_dimx(1);
     v.set_block_dimy(block_dim);
 
@@ -1172,6 +1188,7 @@ inline AMGX_RC vector_set_zero(AMGX_vector_handle vec,
             || block_dim < 1)
         AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, resources)
         cudaSetDevice(v.getResources()->getDevice(0));
+        cudaCheckError();
 
     v.resize(n * block_dim);
     v.set_block_dimy(block_dim);
@@ -1193,6 +1210,7 @@ inline AMGX_RC vector_set_random(AMGX_vector_handle vec, int n, Resources *resou
             || n < 0)
         AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, resources)
         cudaSetDevice(v.getResources()->getDevice(0));
+        cudaCheckError();
 
     Vector<typename VectorLetterT::TConfig_h> t_vec(n);
 
@@ -1259,6 +1277,7 @@ inline AMGX_RC vector_download_impl(const AMGX_vector_handle vec,
         || block_dim < 1)
         AMGX_CHECK_API_ERROR(AMGX_ERR_BAD_PARAMETERS, resources)*/
     cudaSetDevice(v.getResources()->getDevice(0));
+    cudaCheckError();
 
     if (v.getManager() != NULL)
     {
@@ -1547,14 +1566,17 @@ inline AMGX_RC mpi_write_system_distributed(const AMGX_matrix_handle mtx,
         if (mtx_ptr)
         {
             cudaSetDevice(mtx_ptr->getResources()->getDevice(0));
+            cudaCheckError();
         }
         else if (rhs_ptr)
         {
             cudaSetDevice(rhs_ptr->getResources()->getDevice(0));
+            cudaCheckError();
         }
         else
         {
             cudaSetDevice(sol_ptr->getResources()->getDevice(0));
+            cudaCheckError();
         }
 
         rc = MatrixIO<TConfig>::writeSystem(filename, &gA, &grhs, &gsol);
@@ -1763,6 +1785,7 @@ inline AMGX_RC generate_distributed_poisson_7pt(AMGX_matrix_handle mtx,
     VectorW wrapSol(sol_);
     VectorLetterT &sol = *wrapSol.wrapped();
     cudaSetDevice(A_part.getResources()->getDevice(0));
+    cudaCheckError();
     MPI_Comm *mpi_comm = A_part.getResources()->getMpiComm();
     int num_ranks;
     MPI_Comm_size(*mpi_comm, &num_ranks);
@@ -1827,6 +1850,7 @@ inline AMGX_RC matrix_upload_distributed(AMGX_matrix_handle mtx,
     MatrixW wrapA(mtx);
     MatrixLetterT &A_part = *wrapA.wrapped();
     cudaSetDevice(A_part.getResources()->getDevice(0));
+    cudaCheckError();
     MPI_Comm *mpi_comm = A_part.getResources()->getMpiComm();
     int num_ranks;
     MPI_Comm_size(*mpi_comm, &num_ranks);
@@ -1946,6 +1970,7 @@ inline AMGX_RC matrix_comm_from_maps(AMGX_matrix_handle mtx, int allocated_halo_
     MatrixW wrapA(mtx);
     MatrixLetterT &A_part = *wrapA.wrapped();
     cudaSetDevice(A_part.getResources()->getDevice(0));
+    cudaCheckError();
 
     if (allocated_halo_depth > 1)
     {
@@ -2022,14 +2047,17 @@ inline AMGX_RC write_system(const AMGX_matrix_handle mtx,
     if (mtx_ptr)
     {
         cudaSetDevice(mtx_ptr->getResources()->getDevice(0));
+        cudaCheckError();
     }
     else if (rhs_ptr)
     {
         cudaSetDevice(rhs_ptr->getResources()->getDevice(0));
+        cudaCheckError();
     }
     else
     {
         cudaSetDevice(sol_ptr->getResources()->getDevice(0));
+        cudaCheckError();
     }
 
     rc = MatrixIO<TConfig>::writeSystem(filename, mtx_ptr, rhs_ptr, sol_ptr);
@@ -2041,6 +2069,7 @@ inline void solver_get_iterations_number(AMGX_solver_handle slv, int *n)
 {
     auto *solver = get_mode_object_from<CASE, AMG_Solver, AMGX_solver_handle>(slv);
     cudaSetDevice(solver->getResources()->getDevice(0));
+    cudaCheckError();
     *n = solver->get_num_iters();
 }
 
@@ -2052,6 +2081,7 @@ inline AMGX_RC solver_get_iteration_residual(AMGX_solver_handle slv,
 {
     auto *solver = get_mode_object_from<CASE, AMG_Solver, AMGX_solver_handle>(slv);
     cudaSetDevice(solver->getResources()->getDevice(0));
+    cudaCheckError();
 
     if (idx < 0 || idx >= solver->get_residual(it).size())
     {
@@ -2120,6 +2150,7 @@ inline void matrix_download_all(const AMGX_matrix_handle mtx,
     MatrixLetterT &A = *wrapA.wrapped();
     typedef typename MatPrecisionMap<AMGX_GET_MODE_VAL(AMGX_MatPrecision, CASE)>::Type ValueType;
     cudaSetDevice(A.getResources()->getDevice(0));
+    cudaCheckError();
     int n, nnz, block_size;
     n = A.get_num_rows();
     block_size = A.get_block_size();
@@ -2130,6 +2161,7 @@ inline void matrix_download_all(const AMGX_matrix_handle mtx,
         int sizeof_m_val = ((AMGX_GET_MODE_VAL(AMGX_MatPrecision, CASE) == AMGX_matDouble)) ? sizeof(double) : sizeof(float);
         *diag_data = get_c_arr_mem_manager().allocate(n * block_size * sizeof_m_val);
         cudaMemcpy((ValueType *)(*diag_data), A.values.raw() + nnz * block_size, n * block_size * sizeof(ValueType), cudaMemcpyDefault);
+        cudaCheckError();
     }
     else
     {
@@ -2137,7 +2169,9 @@ inline void matrix_download_all(const AMGX_matrix_handle mtx,
     }
 
     cudaMemcpy(row_ptrs, A.row_offsets.raw(), A.row_offsets.size()*sizeof(int), cudaMemcpyDefault);
+    cudaCheckError();
     cudaMemcpy(col_indices, A.col_indices.raw(), A.col_indices.size()*sizeof(int), cudaMemcpyDefault);
+    cudaCheckError();
     cudaMemcpy(data, A.values.raw(), nnz * block_size * sizeof(ValueType), cudaMemcpyDefault);
     cudaCheckError();
 }
@@ -2154,6 +2188,7 @@ inline void vector_bind(AMGX_vector_handle vec, const AMGX_matrix_handle mtx)
     MatrixW wrapA(mtx);
     MatrixLetterT &A = *wrapA.wrapped();
     cudaSetDevice(A.getResources()->getDevice(0));
+    cudaCheckError();
 
     if (A.getResources() != x.getResources())
     {
@@ -2185,6 +2220,7 @@ inline void read_system_maps_one_ring_impl( const AMGX_matrix_handle A_part,
     MatrixW wrapA(A_part);
     MatrixLetterT &A = *wrapA.wrapped();
     cudaSetDevice(A.getResources()->getDevice(0));
+    cudaCheckError();
     A.manager->malloc_export_maps(btl_maps, btl_sizes, lth_maps, lth_sizes);
     *num_neighbors = A.manager->num_neighbors();
     *neighbors = (int *)get_c_arr_mem_manager().allocate((*num_neighbors) * sizeof(int));
@@ -2221,6 +2257,7 @@ inline AMGX_RC matrix_comm_from_maps_one_ring(AMGX_matrix_handle mtx,
     MatrixW wrapA(mtx);
     MatrixLetterT &A_part = *wrapA.wrapped();
     cudaSetDevice(A_part.getResources()->getDevice(0));
+    cudaCheckError();
 
     if (allocated_halo_depth > 1)
     {
@@ -2732,6 +2769,7 @@ extern "C" {
 
             resources = c_r.wrapped().get();
             cudaSetDevice(resources->getDevice(0));
+            cudaCheckError();
 
             switch (mode)
             {
@@ -2839,6 +2877,7 @@ extern "C" {
             {
 #define AMGX_CASE_LINE(CASE) case CASE: { \
       cudaSetDevice(get_mode_object_from<CASE,AMG_Solver,AMGX_solver_handle>(slv)->getResources()->getDevice(0));\
+      cudaCheckError(); \
       remove_managed_object<CASE,AMG_Solver,AMGX_solver_handle>(slv); \
       } \
       break;
@@ -3008,6 +3047,7 @@ extern "C" {
 
             resources = c_r.wrapped().get();
             cudaSetDevice(resources->getDevice(0));
+            cudaCheckError();
 
             switch (mode)
             {
@@ -3085,6 +3125,7 @@ extern "C" {
             {
 #define AMGX_CASE_LINE(CASE) case CASE: { \
       cudaSetDevice(get_mode_object_from<CASE,Matrix,AMGX_matrix_handle>(mtx)->getResources()->getDevice(0));\
+      cudaCheckError(); \
       remove_managed_matrix<CASE>(mtx); \
       } \
       break;
@@ -3380,6 +3421,7 @@ extern "C" {
 
             resources = c_r.wrapped().get();
             cudaSetDevice(resources->getDevice(0));
+            cudaCheckError();
 
             switch (mode)
             {
@@ -3428,6 +3470,7 @@ extern "C" {
             {
 #define AMGX_CASE_LINE(CASE) case CASE: { \
       cudaSetDevice(get_mode_object_from<CASE,Vector,AMGX_vector_handle>(vec)->getResources()->getDevice(0));\
+      cudaCheckError(); \
       remove_managed_object<CASE,Vector,AMGX_vector_handle>(vec);\
       } \
       break;

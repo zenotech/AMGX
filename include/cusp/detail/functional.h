@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2008 - 2024 NVIDIA CORPORATION. All Rights Reserved.
+// SPDX-FileCopyrightText: 2008 - 2025 NVIDIA CORPORATION. All Rights Reserved.
 //
 // SPDX-License-Identifier: BSD-3-Clause
 
@@ -19,10 +19,16 @@ namespace detail
 {
 
 template<typename T>
-  struct zero_function : public amgx::thrust::unary_function<T,T>
+  struct zero_function
 {
   __host__ __device__ T operator()(const T &x) const {return T(0);}
 }; // end minus
+
+template<typename T>
+  struct identity_function
+{
+  __host__ __device__ const T& operator()(const T &x) const {return x;}
+}; // end identity
 
 } // end namespace detail
 } // end namespace cusp
