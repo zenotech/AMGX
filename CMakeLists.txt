@@ -46,15 +46,6 @@ endif()
 # the project
 project (AMG LANGUAGES C CXX CUDA)
 
-# CUDA 13.1+ requires C++17 for Thrust and CUDA C++ Core Libraries
-if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.1")
-  message(STATUS "CUDA ${CUDAToolkit_VERSION} detected, setting C++17 standard")
-  set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard" FORCE)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
-  set(CMAKE_CUDA_STANDARD 17 CACHE STRING "CUDA C++ standard" FORCE)
-  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-endif()
-
 find_package(MPI)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake" ${CMAKE_MODULE_PATH})
