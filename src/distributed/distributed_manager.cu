@@ -2801,8 +2801,24 @@ void DistributedManager<TemplateConfig<AMGX_device, t_vecPrec, t_matPrec, t_indP
 //
     int new_nnz = new_row_offsets[new_row_offsets.size() - 1];
     typedef typename MatPrecisionMap<t_matPrec>::Type ValueTypeA;
-    VVector new_values((new_nnz + 1 )* this->A->get_block_size(), types::util<ValueTypeA>::get_zero());
-    IVector new_col_indices(new_nnz, 0);
+
+    /* Allocate for the nh halo rows appended at the end of this routine, not
+       just for new_nnz, then shrink to the logical size.
+
+       thrust::vector_base::resize grows geometrically: overrun the capacity and
+       it allocates max(2*capacity, new_size) and copies. The
+       new_values.resize((nnz + nh)*bsize + 1) below grows these by only the
+       halo rows, so on a large distributed matrix it doubles a multi-gigabyte
+       array with both buffers live - the peak is twice the matrix for a few
+       percent of extra rows.
+
+       Shrinking never reallocates, so reserving the final size here and then
+       resizing down leaves the capacity in place and makes the later growth
+       free. Same end state, half the peak. */
+    VVector new_values((new_nnz + nh + 1) * this->A->get_block_size(), types::util<ValueTypeA>::get_zero());
+    IVector new_col_indices(new_nnz + nh, 0);
+    new_values.resize((new_nnz + 1) * this->A->get_block_size());
+    new_col_indices.resize(new_nnz);
 
     //reorder based on row permutation
     if (num_blocks > 0)
