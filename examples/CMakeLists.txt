@@ -6,14 +6,13 @@ cmake_minimum_required (VERSION 3.18)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../include" "${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
 
-GET_FILENAME_COMPONENT(CMAKE_C_COMPILER_NAME "${CMAKE_C_COMPILER}" NAME)
-IF(CMAKE_C_COMPILER_NAME MATCHES cl AND NOT CMAKE_C_COMPILER_NAME MATCHES clang)
+IF(WIN32)
   set(libs_all CUDA::cusparse CUDA::cusolver)
   set(dyn_libs amgxsh CUDA::cudart_static CUDA::cublas)
-ELSE(CMAKE_C_COMPILER_NAME MATCHES cl AND NOT CMAKE_C_COMPILER_NAME MATCHES clang)
+ELSE(WIN32)
   set(libs_all CUDA::cusparse CUDA::cusolver rt dl)
   set(dyn_libs amgxsh rt dl CUDA::cudart_static CUDA::cublas MPI::MPI_C)
-ENDIF(CMAKE_C_COMPILER_NAME MATCHES cl AND NOT CMAKE_C_COMPILER_NAME MATCHES clang)
+ENDIF(WIN32)
 
 add_executable(amgx_capi amgx_capi.c)
 

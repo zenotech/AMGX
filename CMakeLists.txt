@@ -190,12 +190,11 @@ if (AMGX_keep_intermediate)
 endif(AMGX_keep_intermediate)
 
 # Windows/linux specific settings for C
-GET_FILENAME_COMPONENT(CMAKE_C_COMPILER_NAME "${CMAKE_C_COMPILER}" NAME)
-IF(CMAKE_C_COMPILER_NAME MATCHES cl AND NOT CMAKE_C_COMPILER_NAME MATCHES clang)
+IF(WIN32)
     set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-ELSE(CMAKE_C_COMPILER_NAME MATCHES cl AND NOT CMAKE_C_COMPILER_NAME MATCHES clang)
+ELSE(WIN32)
     set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -rdynamic -fPIC -fvisibility=default)
-ENDIF(CMAKE_C_COMPILER_NAME MATCHES cl AND NOT CMAKE_C_COMPILER_NAME MATCHES clang)
+ENDIF(WIN32)
 
 # VS: include object files in target property SOURCES
 # otherwise a workaround for extracting ${obj_all} is necessary below
