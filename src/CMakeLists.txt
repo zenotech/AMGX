@@ -42,8 +42,7 @@ target_include_directories(amgx_tests_launcher PRIVATE ${AMGX_INCLUDES})
 
 # create executables for host and device, scalar and block version
 
-GET_FILENAME_COMPONENT(CMAKE_C_COMPILER_NAME "${CMAKE_C_COMPILER}" NAME)
-IF(CMAKE_C_COMPILER_NAME MATCHES cl)
+IF(WIN32)
     set(libs_all CUDA::cusparse CUDA::cublas)
 ELSE()
     set(libs_all CUDA::cusparse CUDA::cublas rt dl)
