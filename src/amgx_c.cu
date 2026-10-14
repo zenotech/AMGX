@@ -5544,7 +5544,7 @@ extern "C" {
         return AMGX_RC_OK;
     }
 
-    AMGX_RC AMGX_matrix_check_diag_dominant(const AMGX_matrix_handle mtx, int* diag_dominant)
+    AMGX_RC AMGX_API AMGX_matrix_check_diag_dominant(const AMGX_matrix_handle mtx, int* diag_dominant)
     {
         nvtxRange nvrf(__func__);
 
